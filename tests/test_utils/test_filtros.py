@@ -47,7 +47,8 @@ def test_load_referencia_reads_file_and_uses_cache(
     loaded_second = filtros.load_referencia()
 
     assert loaded_first == sample
-    assert loaded_second is loaded_first
+    # CacheManager serializes/deserializes, so we check equality not identity
+    assert loaded_second == loaded_first
 
 
 def test_load_referencia_raises_file_not_found(

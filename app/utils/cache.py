@@ -295,13 +295,13 @@ class CacheManager:
 
     def exists(self, key: str) -> bool:
         """
-        Check if key exists in cache.
+        Check if key exists in cache and is not expired.
 
         Args:
             key: Cache key (without prefix)
 
         Returns:
-            True if key exists, False otherwise
+            True if key exists and is not expired, False otherwise
         """
         # Check connection on first use (lazy loading)
         self._check_connection()
@@ -312,7 +312,19 @@ class CacheManager:
             if self._redis_client:
                 return bool(self._redis_client.exists(full_key))
             else:
-                return full_key in self._memory_cache
+                if full_key not in self._memory_cache:
+                    return False
+
+                # Check if expired (entry is tuple of (expiration_time, value))
+                entry = self._memory_cache[full_key]
+                if isinstance(entry, tuple):
+                    expiration_time, _ = entry
+                    if time.time() > expiration_time:
+                        # Entry expired, remove it
+                        del self._memory_cache[full_key]
+                        logger.debug(f"Cache entry expired on exists(): {full_key}")
+                        return False
+                return True
 
         except Exception as e:
             logger.error(f"Error checking cache key {key}: {e}")

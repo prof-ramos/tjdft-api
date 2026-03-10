@@ -142,6 +142,9 @@ class TestCacheManagerRedis:
 
         cache = CacheManager()
 
+        # With lazy loading, need to trigger a cache operation to check connection
+        cache.set("test", {"value": 1})
+
         assert cache._redis_client is None
 
     def test_redis_backend_roundtrip_and_close(self):
