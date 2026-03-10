@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 # Cache key for reference data
 REFERENCIA_DATA_CACHE_KEY = "referencia:data"
 
+# Cache TTL for reference data (24 hours = 86400 seconds)
+REFERENCIA_TTL = 86400
+
 
 def load_referencia() -> Dict[str, Any]:
     """
@@ -57,8 +60,8 @@ def load_referencia() -> Dict[str, Any]:
         with open(referencia_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Cache for 24 hours (86400 seconds)
-        cache.set(cache_key, data, ttl=86400)
+        # Cache for 24 hours
+        cache.set(cache_key, data, ttl=REFERENCIA_TTL)
 
         logger.debug(f"Reference data loaded from {referencia_path} and cached")
         return data
