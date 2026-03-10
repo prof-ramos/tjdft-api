@@ -1,5 +1,6 @@
 """Serviço unificado de busca de decisões judiciais."""
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime
@@ -143,21 +144,25 @@ class BuscaService:
 
             total_depois_filtro = len(dados)
 
-            # 6. Enrich data with instancia and relevance summary
-            dados_enriquecidos = []
-            for registro in dados:
+            # 6. Enrich data with instancia and relevance summary (parallel processing)
+            async def enriquecer_registro(registro: Dict[str, Any]) -> Dict[str, Any]:
+                """Enrich a single record with instancia and relevance summary."""
                 instancia = calcular_instancia(
                     turma_recursal=registro.get("turmaRecursal"),
                     subbase=registro.get("subbase"),
                 )
                 resumo = extrair_marcadores_relevancia(registro.get("marcadores"))
                 # Use dict unpacking (no in-place mutation)
-                enriched = {
+                return {
                     **registro,
                     "instancia": instancia,
                     "resumo_relevancia": resumo,
                 }
-                dados_enriquecidos.append(enriched)
+
+            # Process all records in parallel using asyncio.gather
+            dados_enriquecidos = await asyncio.gather(
+                *[enriquecer_registro(registro) for registro in dados]
+            )
 
             # 7. Calculate density metrics
             densidade = calcular_densidade(total_antes_filtro)

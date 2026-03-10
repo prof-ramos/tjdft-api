@@ -10,16 +10,20 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
+from app.utils.cache import get_cache
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Cache for reference data
-_referencia_cache: Optional[Dict[str, Any]] = None
+# In-memory cache flag to avoid repeated file reads
+_referencia_loaded = False
 
 
 def load_referencia() -> Dict[str, Any]:
     """
-    Load reference data from JSON file.
+    Load reference data from JSON file with 24h cache.
+
+    Uses CacheManager singleton for efficient caching with TTL.
 
     Returns:
         Dict containing reference data with keys:
@@ -32,11 +36,18 @@ def load_referencia() -> Dict[str, Any]:
         FileNotFoundError: If reference file doesn't exist
         json.JSONDecodeError: If JSON is invalid
     """
-    global _referencia_cache
+    global _referencia_loaded
 
-    if _referencia_cache is not None:
-        return _referencia_cache
+    # Try to get from cache first (24h TTL = 86400 seconds)
+    cache = get_cache()
+    cache_key = "referencia:data"
 
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        logger.debug("Reference data loaded from cache")
+        return cached_data
+
+    # Load from file if not in cache
     try:
         referencia_path = (
             Path(__file__).parent.parent.parent / "data" / "referencia.json"
@@ -46,10 +57,14 @@ def load_referencia() -> Dict[str, Any]:
             raise FileNotFoundError(f"Reference file not found: {referencia_path}")
 
         with open(referencia_path, "r", encoding="utf-8") as f:
-            _referencia_cache = json.load(f)
+            data = json.load(f)
 
-        logger.debug(f"Reference data loaded from {referencia_path}")
-        return _referencia_cache
+        # Cache for 24 hours (86400 seconds)
+        cache.set(cache_key, data, ttl=86400)
+        _referencia_loaded = True
+
+        logger.debug(f"Reference data loaded from {referencia_path} and cached")
+        return data
 
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding reference JSON: {e}")
@@ -200,8 +215,8 @@ def clear_referencia_cache() -> None:
 
     This forces the next load_referencia() call to reload from disk.
     """
-    global _referencia_cache
-    _referencia_cache = None
+    cache = get_cache()
+    cache.delete("referencia:data")
     logger.debug("Reference data cache cleared")
 
 

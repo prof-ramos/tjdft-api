@@ -7,6 +7,7 @@ Provides a unified caching interface with Redis support and in-memory fallback.
 import hashlib
 import json
 import logging
+from collections import OrderedDict
 from typing import Any, Optional, Union
 from urllib.parse import urlparse
 
@@ -52,7 +53,9 @@ class CacheManager:
         self.default_ttl = default_ttl
         self.prefix = prefix
         self._redis_client: Optional[Any] = None
-        self._memory_cache: dict = {}
+        self._memory_cache: OrderedDict = OrderedDict()
+        self._max_memory_items = 1000  # LRU limit for in-memory cache
+        self._connection_checked = False
 
         if REDIS_AVAILABLE:
             try:
@@ -73,8 +76,7 @@ class CacheManager:
                         socket_connect_timeout=5,
                         socket_timeout=5,
                     )
-                # Test connection
-                self._redis_client.ping()
+                # Defer connection check to first use (lazy loading)
                 # Sanitize URL for logging (remove password)
                 if redis_url:
                     parsed = urlparse(redis_url)
@@ -83,12 +85,12 @@ class CacheManager:
                         if parsed.port
                         else parsed.hostname
                     )
-                    logger.info(f"Connected to Redis at {safe_host}")
+                    logger.info(f"Redis client configured for {safe_host}")
                 else:
-                    logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
+                    logger.info(f"Redis client configured for {redis_host}:{redis_port}")
             except Exception as e:
                 logger.warning(
-                    f"Failed to connect to Redis: {e}. Using in-memory cache."
+                    f"Failed to configure Redis: {e}. Using in-memory cache."
                 )
                 self._redis_client = None
         else:
@@ -105,6 +107,29 @@ class CacheManager:
             Full key with prefix
         """
         return f"{self.prefix}:{key}"
+
+    def _check_connection(self) -> None:
+        """
+        Check Redis connection on first use (lazy loading).
+
+        This method is called on the first cache operation to verify
+        that the Redis connection is working. If not, it falls back
+        to in-memory cache.
+        """
+        if self._connection_checked or not self._redis_client:
+            return
+
+        try:
+            self._redis_client.ping()
+            self._connection_checked = True
+            logger.debug("Redis connection verified on first use")
+        except Exception as e:
+            logger.warning(
+                f"Redis connection check failed on first use: {e}. "
+                "Falling back to in-memory cache."
+            )
+            self._redis_client = None
+            self._connection_checked = True
 
     def _serialize(self, value: Any) -> str:
         """
@@ -140,6 +165,9 @@ class CacheManager:
         Returns:
             Cached value or None if not found
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
 
         try:
@@ -149,6 +177,8 @@ class CacheManager:
                     return self._deserialize(value)
             else:
                 if full_key in self._memory_cache:
+                    # Move to end (most recently used)
+                    self._memory_cache.move_to_end(full_key)
                     return self._deserialize(self._memory_cache[full_key])
 
             return None
@@ -174,6 +204,9 @@ class CacheManager:
         Returns:
             True if successful, False otherwise
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
         ttl = ttl if ttl is not None else self.default_ttl
 
@@ -183,7 +216,15 @@ class CacheManager:
             if self._redis_client:
                 self._redis_client.setex(full_key, ttl, serialized_value)
             else:
+                # Add to cache (moves to end as most recently used)
                 self._memory_cache[full_key] = serialized_value
+                # Enforce LRU limit - remove oldest if over limit
+                if len(self._memory_cache) > self._max_memory_items:
+                    self._memory_cache.popitem(last=False)
+                    logger.debug(
+                        f"LRU cache limit reached ({self._max_memory_items}), "
+                        "oldest entry removed"
+                    )
 
             logger.debug(f"Cached key: {full_key} (TTL: {ttl}s)")
             return True
