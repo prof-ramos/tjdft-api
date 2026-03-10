@@ -15,8 +15,8 @@ from app.utils.cache import get_cache
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# In-memory cache flag to avoid repeated file reads
-_referencia_loaded = False
+# Cache key for reference data
+REFERENCIA_DATA_CACHE_KEY = "referencia:data"
 
 
 def load_referencia() -> Dict[str, Any]:
@@ -36,11 +36,9 @@ def load_referencia() -> Dict[str, Any]:
         FileNotFoundError: If reference file doesn't exist
         json.JSONDecodeError: If JSON is invalid
     """
-    global _referencia_loaded
-
     # Try to get from cache first (24h TTL = 86400 seconds)
     cache = get_cache()
-    cache_key = "referencia:data"
+    cache_key = REFERENCIA_DATA_CACHE_KEY
 
     cached_data = cache.get(cache_key)
     if cached_data is not None:
@@ -61,7 +59,6 @@ def load_referencia() -> Dict[str, Any]:
 
         # Cache for 24 hours (86400 seconds)
         cache.set(cache_key, data, ttl=86400)
-        _referencia_loaded = True
 
         logger.debug(f"Reference data loaded from {referencia_path} and cached")
         return data
@@ -216,7 +213,7 @@ def clear_referencia_cache() -> None:
     This forces the next load_referencia() call to reload from disk.
     """
     cache = get_cache()
-    cache.delete("referencia:data")
+    cache.delete(REFERENCIA_DATA_CACHE_KEY)
     logger.debug("Reference data cache cleared")
 
 

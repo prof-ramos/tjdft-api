@@ -216,6 +216,10 @@ class CacheManager:
             if self._redis_client:
                 self._redis_client.setex(full_key, ttl, serialized_value)
             else:
+                # If key already exists, move to end (most recently used)
+                if full_key in self._memory_cache:
+                    self._memory_cache.move_to_end(full_key)
+
                 # Add to cache (moves to end as most recently used)
                 self._memory_cache[full_key] = serialized_value
                 # Enforce LRU limit - remove oldest if over limit
@@ -243,6 +247,9 @@ class CacheManager:
         Returns:
             True if successful, False otherwise
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
 
         try:
@@ -269,6 +276,9 @@ class CacheManager:
         Returns:
             True if key exists, False otherwise
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
 
         try:
