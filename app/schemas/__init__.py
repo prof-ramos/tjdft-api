@@ -13,7 +13,9 @@ from app.schemas.decisao import (
     DecisaoBase,
     DecisaoCreate,
     DecisaoListResponse,
-    DecisaoResponse as DecisaoFullResponse,
+)
+from app.schemas.decisao import DecisaoResponse as DecisaoFullResponse
+from app.schemas.decisao import (
     DecisaoUpdate,
 )
 

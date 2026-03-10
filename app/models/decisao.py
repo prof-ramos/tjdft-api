@@ -1,8 +1,6 @@
 """Decisao model for decision cache."""
 
 import uuid
-from datetime import datetime, date
-from typing import Optional
 
 from sqlalchemy import Column, Date, DateTime, String, Text
 from sqlalchemy.sql import func
@@ -32,9 +30,7 @@ class Decisao(Base):
     criado_em = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    atualizado_em = Column(
-        DateTime(timezone=True), onupdate=func.now(), nullable=True
-    )
+    atualizado_em = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     def __repr__(self) -> str:
         return f"<Decisao(uuid_tjdft={self.uuid_tjdft}, processo={self.processo})>"

@@ -1,0 +1,78 @@
+# TJDFT API Quick Wins - Progress
+
+## Iteration 1 Complete ✓
+**Date:** 2025-03-10
+**Plan:** tjdft-quick-wins-revised.md
+**Architect Verdict:** APPROVE
+
+## All Stories Complete ✓
+
+- [x] US-001: Criar módulo de enriquecimento (enrichment.py)
+- [x] US-002: Adicionar funções de filtro pós-processamento (filtros.py)
+- [x] US-003: Atualizar schemas com herança e Pydantic aliases
+- [x] US-004: Integrar enriquecimento no BuscaService
+- [x] US-005: Criar endpoint de busca com novos filtros
+- [x] US-006: Registrar router no main.py
+- [x] US-007: Criar testes unitários e de integração
+
+## Features Delivered
+
+### Feature #3: Alerta de Densidade de Precedentes
+- Classifica `hits.value` em: escasso (<20), moderado (20-499), consolidado (500-4999), massivo (≥5000)
+- Campo `densidade` no response com categoria, total e alerta
+
+### Feature #4: Segregação de Instância
+- Calcula `instancia` a partir de `turmaRecursal` e `subbase`
+- Valores: "juizado_especial" ou "tjdft_2a_instancia"
+- Query param `?excluir_turmas_recursais=true`
+
+### Feature #5: Filtro de Relatores Ativos
+- Usa campo `relatorAtivo` da API
+- Query param `?apenas_ativos=true`
+- Filtragem pós-processamento com preservação de original
+
+### Feature #6: Triagem por Marcadores
+- Promove campo `marcadores` como `resumo_relevancia`
+- Mostra snippets relevantes em vez de ementa completa
+
+## Files Created/Modified
+
+### Created:
+- app/utils/enrichment.py
+- app/api/v1/endpoints/busca.py
+- tests/test_utils/test_enrichment.py
+- tests/test_api/test_busca.py
+
+### Modified:
+- app/utils/filtros.py (added 2 filter functions)
+- app/schemas/decisao.py (aliases, DecisaoEnriquecida)
+- app/schemas/consulta.py (BuscaRequest fields, BuscaResponseEnriquecida)
+- app/services/busca_service.py (enrichment + filtering integration)
+- app/main.py (router registration)
+
+## Test Results
+- Unit tests: 17 passed in 0.12s
+- Coverage (enrichment.py): 77%
+
+## Architect Review
+**Status:** APPROVE
+- OCP Compliance: ✓ (DecisaoEnriquecida inherits from DecisaoBase)
+- SRP Compliance: ✓ (enrichment separated from filtering)
+- Dual Counts: ✓ (total + total_filtrado)
+- Field Mapping: ✓ (Pydantic aliases configured)
+- No Mutation: ✓ (dict unpacking used)
+- Edge Cases: ✓ (.get() with defaults)
+- Endpoint: ✓ (get_session, model_copy, correct params)
+
+## 11 Critic Fixes Applied
+1. Circular import removed
+2. Field mapping with Pydantic aliases
+3. Dependency injection with get_session
+4. In-place mutation → dict unpacking
+5. Query params added to schema
+6. Edge case handling for monocratic decisions
+7. Correct dependency function (get_session)
+8. Correct service constructor (session, cache_manager)
+9. model_copy() fields added to schema
+10. Total extraction uses result.get("total")
+11. Filename consistency (filtros.py)

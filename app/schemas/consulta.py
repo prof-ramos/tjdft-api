@@ -1,10 +1,11 @@
 """Schemas for consulta operations."""
 
-import uuid
-from datetime import datetime, date
-from typing import Optional, Any, Dict
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+from app.schemas.decisao import DecisaoEnriquecida
 
 
 class BuscaRequest(BaseModel):
@@ -17,6 +18,12 @@ class BuscaRequest(BaseModel):
     pagina: int = Field(default=1, ge=1, description="Page number (1-indexed)")
     tamanho: int = Field(
         default=20, ge=1, le=100, description="Results per page (max 100)"
+    )
+    excluir_turmas_recursais: Optional[bool] = Field(
+        None, description="Exclude turmas recursais from results"
+    )
+    apenas_ativos: Optional[bool] = Field(
+        None, description="Filter only active relatores"
     )
 
     model_config = {"from_attributes": True}
@@ -48,5 +55,19 @@ class DecisaoResponse(BaseModel):
     data_julgamento: Optional[date] = Field(None, description="Judgment date")
     orgao_julgador: Optional[str] = Field(None, description="Judging body")
     classe: Optional[str] = Field(None, description="Process class/type")
+
+    model_config = {"from_attributes": True}
+
+
+class BuscaResponseEnriquecida(BaseModel):
+    """Enriched response schema for search operations with density metrics."""
+
+    resultados: List[DecisaoEnriquecida] = Field(
+        ..., description="List of enriched decisions"
+    )
+    total_filtrado: int = Field(..., description="Total results after filtering")
+    densidade: Optional[Dict[str, Any]] = Field(
+        None, description="Density metrics by category"
+    )
 
     model_config = {"from_attributes": True}

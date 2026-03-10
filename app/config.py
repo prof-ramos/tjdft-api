@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./tjdft.db",
+        default="sqlite+aiosqlite:///./tjdft.db",
         description="Database connection URL",
     )
 

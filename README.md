@@ -107,7 +107,9 @@ tjdft-api/
 
 ```bash
 # Database
-DATABASE_URL=sqlite:///./tjdft.db
+DATABASE_URL=sqlite+aiosqlite:///./tjdft.db
+# Para PostgreSQL:
+# DATABASE_URL=postgresql+asyncpg://user:password@localhost/tjdft_db
 
 # Cache
 REDIS_URL=redis://localhost:6379
@@ -116,6 +118,46 @@ CACHE_TTL=3600
 # API
 DEBUG=false
 ```
+
+## 🗄️ Migrations com Alembic
+
+Este projeto usa Alembic para gerenciar migrations do banco de dados, com suporte a PostgreSQL e SQLite.
+
+### Comandos Básicos
+
+```bash
+# Criar uma nova migration (autogenerate a partir dos models)
+alembic revision --autogenerate -m "Descrição da mudança"
+
+# Aplicar migrations (upgrade para a versão mais recente)
+alembic upgrade head
+
+# Reverter a última migration
+alembic downgrade -1
+
+# Reverter para uma versão específica
+alembic downgrade <revision_id>
+
+# Ver o histórico de migrations
+alembic history
+
+# Ver a versão atual
+alembic current
+```
+
+### Suporte a Banco de Dados
+
+**SQLite (padrão - desenvolvimento):**
+```bash
+DATABASE_URL=sqlite+aiosqlite:///./tjdft.db
+```
+
+**PostgreSQL (produção):**
+```bash
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/tjdft_db
+```
+
+As migrations funcionam automaticamente com ambos os bancos, usando o driver apropriado.
 
 ## 📦 Stack Tecnológico
 

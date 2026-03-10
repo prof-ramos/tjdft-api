@@ -1,7 +1,11 @@
 """Test main application endpoints"""
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+pytestmark = pytest.mark.api
 
 client = TestClient(app)
 

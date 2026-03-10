@@ -1,14 +1,14 @@
 """
 Validation filters for TJDFT API.
 
-This module provides validation functions for reference data
-including relatores (judges), classes (case types), and órgãos julgadores (court divisions).
+This module provides validation functions for reference data including relatores
+(judges), classes (case types), and órgãos julgadores (court divisions).
 """
 
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional, cast
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -38,12 +38,12 @@ def load_referencia() -> Dict[str, Any]:
         return _referencia_cache
 
     try:
-        referencia_path = Path(__file__).parent.parent.parent / "data" / "referencia.json"
+        referencia_path = (
+            Path(__file__).parent.parent.parent / "data" / "referencia.json"
+        )
 
         if not referencia_path.exists():
-            raise FileNotFoundError(
-                f"Reference file not found: {referencia_path}"
-            )
+            raise FileNotFoundError(f"Reference file not found: {referencia_path}")
 
         with open(referencia_path, "r", encoding="utf-8") as f:
             _referencia_cache = json.load(f)
@@ -143,7 +143,7 @@ def get_relatores() -> List[Dict[str, str]]:
     """
     try:
         referencia = load_referencia()
-        return referencia.get("relatores", [])
+        return cast(List[Dict[str, str]], referencia.get("relatores", []))
     except Exception as e:
         logger.error(f"Error getting relatores: {e}")
         return []
@@ -158,7 +158,7 @@ def get_classes() -> List[Dict[str, str]]:
     """
     try:
         referencia = load_referencia()
-        return referencia.get("classes", [])
+        return cast(List[Dict[str, str]], referencia.get("classes", []))
     except Exception as e:
         logger.error(f"Error getting classes: {e}")
         return []
@@ -173,7 +173,7 @@ def get_orgaos() -> List[Dict[str, str]]:
     """
     try:
         referencia = load_referencia()
-        return referencia.get("orgaos_julgadores", [])
+        return cast(List[Dict[str, str]], referencia.get("orgaos_julgadores", []))
     except Exception as e:
         logger.error(f"Error getting órgãos: {e}")
         return []
@@ -188,7 +188,7 @@ def get_assuntos() -> List[Dict[str, str]]:
     """
     try:
         referencia = load_referencia()
-        return referencia.get("assuntos", [])
+        return cast(List[Dict[str, str]], referencia.get("assuntos", []))
     except Exception as e:
         logger.error(f"Error getting assuntos: {e}")
         return []
@@ -203,3 +203,72 @@ def clear_referencia_cache() -> None:
     global _referencia_cache
     _referencia_cache = None
     logger.debug("Reference data cache cleared")
+
+
+def filtrar_por_instancia(
+    registros: List[Dict[str, Any]], excluir_turmas_recursais: bool
+) -> List[Dict[str, Any]]:
+    """
+    Filter records by instancia, excluding turmas recursais when requested.
+
+    Args:
+        registros: List of decision records to filter
+        excluir_turmas_recursais: If False, return registros unchanged.
+            If True, filter out turma recursal records.
+
+    Returns:
+        NEW list of filtered records (original list is not modified).
+
+    Note:
+        - Turmas recursais are identified by turmaRecursal=True
+          OR subbase=="acordaos-tr"
+        - Missing turmaRecursal field is treated as False (record is kept)
+        - Monocratic decisions may have different field structures
+    """
+    if not excluir_turmas_recursais:
+        return registros
+
+    filtrados = []
+    for registro in registros:
+        turma_recursal = registro.get("turmaRecursal", False)
+        subbase = registro.get("subbase", "")
+
+        # Keep record if it's not a turma recursal
+        if not turma_recursal and subbase != "acordaos-tr":
+            filtrados.append(registro)
+
+    return filtrados
+
+
+def filtrar_relatores_ativos(
+    registros: List[Dict[str, Any]], apenas_ativos: bool
+) -> List[Dict[str, Any]]:
+    """
+    Filter records to only include active relatores (judges).
+
+    Args:
+        registros: List of decision records to filter
+        apenas_ativos: If False, return registros unchanged.
+            If True, keep only records with active relatores.
+
+    Returns:
+        NEW list of filtered records (original list is not modified).
+
+    Note:
+        - Active relatores are identified by relatorAtivo=True
+        - Missing relatorAtivo field results in exclusion (conservative approach)
+        - Monocratic decisions may not have this field and will be excluded
+    """
+    if not apenas_ativos:
+        return registros
+
+    filtrados = []
+    for registro in registros:
+        # Use .get() with default None to detect missing field
+        relator_ativo = registro.get("relatorAtivo")
+
+        # Keep only records where relatorAtivo is explicitly True
+        if relator_ativo is True:
+            filtrados.append(registro)
+
+    return filtrados

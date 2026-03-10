@@ -69,6 +69,12 @@ venv.bak/
 # Logs
 *.log
 
+# Agent/runtime artifacts
+.omc/sessions/
+.omc/state/
+.omx/
+analisecoderabbit_debug.md
+
 # MyPy
 .mypy_cache/
 .dmypy.json

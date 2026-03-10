@@ -1,7 +1,9 @@
 """Main FastAPI application entry point"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.endpoints.busca import router as busca_router
 from app.config import get_settings
 
 settings = get_settings()
@@ -23,6 +25,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(busca_router, prefix="/api/v1")
+
+
 @app.get("/", tags=["Root"])
 async def root():
     """API root endpoint"""
@@ -32,6 +38,7 @@ async def root():
         "docs": "/docs",
         "redoc": "/redoc",
     }
+
 
 @app.get("/health", tags=["Health"])
 async def health_check():

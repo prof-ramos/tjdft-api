@@ -1,10 +1,8 @@
 """Consulta model for search history."""
 
 import uuid
-from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, DateTime, Integer, String, JSON
+from sqlalchemy import JSON, Column, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
@@ -22,7 +20,7 @@ class Consulta(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     query = Column(String, nullable=False)
-    filtros = Column(JSONB, nullable=True)
+    filtros = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
     resultados_encontrados = Column(Integer, default=0)
     pagina = Column(Integer, default=1)
     tamanho = Column(Integer, default=20)

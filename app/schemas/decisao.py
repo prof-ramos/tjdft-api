@@ -1,8 +1,7 @@
 """Schemas for decisao operations."""
 
-import uuid
-from datetime import datetime, date
-from typing import Optional
+from datetime import date, datetime
+from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,17 +9,33 @@ from pydantic import BaseModel, Field
 class DecisaoBase(BaseModel):
     """Base schema for decisao with common fields."""
 
-    uuid_tjdft: str = Field(..., description="TJDFT UUID for the decision")
-    processo: Optional[str] = Field(None, description="Process number")
+    uuid_tjdft: str = Field(
+        ..., alias="uuid", description="TJDFT UUID for the decision"
+    )
+    processo: Optional[str] = Field(
+        None, alias="numeroProcesso", description="Process number"
+    )
     ementa: Optional[str] = Field(None, description="Decision summary (ementa)")
-    inteiro_teor: Optional[str] = Field(None, description="Full decision text")
-    relator: Optional[str] = Field(None, description="Relator name")
-    data_julgamento: Optional[date] = Field(None, description="Judgment date")
-    data_publicacao: Optional[date] = Field(None, description="Publication date")
-    orgao_julgador: Optional[str] = Field(None, description="Judging body")
-    classe: Optional[str] = Field(None, description="Process class/type")
+    inteiro_teor: Optional[str] = Field(
+        None, alias="inteiroTeorHtml", description="Full decision text"
+    )
+    relator: Optional[str] = Field(
+        None, alias="nomeRelator", description="Relator name"
+    )
+    data_julgamento: Optional[date] = Field(
+        None, alias="dataJulgamento", description="Judgment date"
+    )
+    data_publicacao: Optional[date] = Field(
+        None, alias="dataPublicacao", description="Publication date"
+    )
+    orgao_julgador: Optional[str] = Field(
+        None, alias="descricaoOrgaoJulgador", description="Judging body"
+    )
+    classe: Optional[str] = Field(
+        None, alias="descricaoClasseCnj", description="Process class/type"
+    )
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class DecisaoCreate(DecisaoBase):
@@ -49,9 +64,7 @@ class DecisaoResponse(DecisaoBase):
 
     id: str = Field(..., description="Internal database ID")
     criado_em: datetime = Field(..., description="Creation timestamp")
-    atualizado_em: Optional[datetime] = Field(
-        None, description="Last update timestamp"
-    )
+    atualizado_em: Optional[datetime] = Field(None, description="Last update timestamp")
 
 
 class DecisaoListResponse(BaseModel):
@@ -64,3 +77,15 @@ class DecisaoListResponse(BaseModel):
     total_paginas: int = Field(..., description="Total number of pages")
 
     model_config = {"from_attributes": True}
+
+
+class DecisaoEnriquecida(DecisaoBase):
+    """Enriched decision schema with additional analysis fields."""
+
+    resumo_relevancia: Optional[Dict[str, str]] = Field(
+        None, description="Relevance summary by category"
+    )
+    instancia: Optional[str] = Field(None, description="Court instance (1ª/2ª)")
+    relator_ativo: Optional[bool] = Field(
+        None, alias="relatorAtivo", description="Whether relator is active"
+    )

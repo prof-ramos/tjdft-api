@@ -7,10 +7,19 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "python-dotenv>=1.0.0",
     "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "aiosqlite>=0.19.0",
+    "asyncpg>=0.29.0",
+    "greenlet>=3.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "httpx>=0.26.0",
+    "openai>=1.12.0",
 ]
 
 [project.optional-dependencies]
@@ -18,7 +27,6 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.23.0",
-    "httpx>=0.26.0",
     "black>=24.0.0",
     "isort>=5.13.0",
     "flake8>=7.0.0",
@@ -30,8 +38,13 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=app --cov-report=term-missing"
+addopts = "--strict-markers --cov=app --cov-report=term-missing"
 asyncio_mode = "auto"
+markers = [
+    "unit: testes rápidos e isolados, sem banco real ou rede",
+    "integration: testes com integração de banco ou múltiplas camadas locais",
+    "api: testes de contrato HTTP e wiring da aplicação FastAPI",
+]
 
 [tool.black]
 line-length = 88
@@ -42,11 +55,23 @@ include = '\.pyi?$'
 profile = "black"
 line_length = 88
 
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203"]
+
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["redis"]
+ignore_missing_imports = true
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["alembic*", "data*", "tests*"]
 
 [build-system]
 requires = ["setuptools>=61.0"]

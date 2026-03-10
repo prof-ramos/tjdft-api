@@ -1,0 +1,139 @@
+{
+  "title": "TJDFT API Quick Wins - Diferenciais para o Advogado",
+  "description": "Implementar 4 features que usam campos j\u00e1 retornados pela API do TJDFT para adicionar valor \u00e0 busca de jurisprud\u00eancia",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Criar m\u00f3dulo de enriquecimento (enrichment.py)",
+      "description": "Criar app/utils/enrichment.py com fun\u00e7\u00f5es puras para calcular densidade de precedentes, inst\u00e2ncia e extrair marcadores de relev\u00e2ncia",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Arquivo app/utils/enrichment.py existe",
+        "Fun\u00e7\u00e3o calcular_densidade(total) retorna dict com 'categoria', 'total', 'alerta'",
+        "calcular_densidade(10) retorna categoria='escasso' e alerta cont\u00e9m 'Poucos precedentes'",
+        "calcular_densidade(100) retorna categoria='moderado'",
+        "calcular_densidade(1000) retorna categoria='consolidado'",
+        "calcular_densidade(10000) retorna categoria='massivo' e alerta cont\u00e9m 'massiva'",
+        "Fun\u00e7\u00e3o calcular_instancia(turma_recursal=True) retorna 'juizado_especial'",
+        "Fun\u00e7\u00e3o calcular_instancia(subbase='acordaos-tr') retorna 'juizado_especial'",
+        "Fun\u00e7\u00e3o calcular_instancia(turma_recursal=False) retorna 'tjdft_2a_instancia'",
+        "Fun\u00e7\u00e3o extrair_marcadores_relevancia({}) retorna {}",
+        "Fun\u00e7\u00e3o extrair_marcadores_relevancia({'ementa': ['snippet']}) retorna {'ementa': 'snippet'}",
+        "Todas as fun\u00e7\u00f5es t\u00eam type hints",
+        "Todas as fun\u00e7\u00f5es t\u00eam docstrings"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Adicionar fun\u00e7\u00f5es de filtro p\u00f3s-processamento (filtros.py)",
+      "description": "Adicionar filtrar_por_instancia e filtrar_relatores_ativos ao app/utils/filtros.py",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Arquivo app/utils/filtros.py cont\u00e9m filtrar_por_instancia",
+        "filtrar_por_instancia([], False) retorna []",
+        "filtrar_por_instancia([{'turmaRecursal': True}], True) retorna [] (exclu\u00eddo)",
+        "filtrar_por_instancia([{'turmaRecursal': True}], False) retorna [{'turmaRecursal': True}] (mantido)",
+        "filtrar_por_instancia([{'subbase': 'acordaos-tr'}], True) retorna [] (exclu\u00eddo)",
+        "filtrar_por_instancia handle_missing_fields: registro sem turmaRecursal \u00e9 mantido",
+        "Arquivo app/utils/filtros.py cont\u00e9m filtrar_relatores_ativos",
+        "filtrar_relatores_ativos([{'relatorAtivo': True}], True) retorna [{'relatorAtivo': True}]",
+        "filtrar_relatores_ativos([{'relatorAtivo': False}], True) retorna []",
+        "filtrar_relatores_ativos([{'relatorAtivo': True}, {}], True) retorna apenas [{'relatorAtivo': True}]",
+        "filtrar_relatores_ativos handle_missing: registro sem relatorAtivo \u00e9 exclu\u00eddo quando apenas_ativos=True"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Atualizar schemas com heran\u00e7a e Pydantic aliases",
+      "description": "Adicionar aliases ao DecisaoBase para mapear campos da API, criar DecisaoEnriquecida, e adicionar campos ao BuscaRequest",
+      "passes": true,
+      "acceptanceCriteria": [
+        "DecisaoBase tem alias='uuid' em uuid_tjdft",
+        "DecisaoBase tem alias='numeroProcesso' em processo",
+        "DecisaoBase tem alias='nomeRelator' em relator",
+        "DecisaoBase tem alias='dataJulgamento' em data_julgamento",
+        "DecisaoBase tem alias='descricaoOrgaoJulgador' em orgao_julgador",
+        "DecisaoBase tem alias='descricaoClasseCnj' em classe",
+        "DecisaoBase tem alias='inteiroTeorHtml' em inteiro_teor",
+        "DecisaoBase tem alias='dataPublicacao' em data_publicacao",
+        "DecisaoBase tem model_config com populate_by_name=True",
+        "DecisaoEnriquecida existe e herda de DecisaoBase",
+        "DecisaoEnriquecida tem campo resumo_relevancia: Optional[Dict[str, str]]",
+        "DecisaoEnriquecida tem campo instancia: Optional[str]",
+        "DecisaoEnriquecida tem campo relator_ativo: Optional[bool] com alias='relatorAtivo'",
+        "BuscaRequest tem campo excluir_turmas_recursais: Optional[bool]",
+        "BuscaRequest tem campo apenas_ativos: Optional[bool]",
+        "BuscaResponseEnriquecida existe em app/schemas/consulta.py",
+        "BuscaResponseEnriquecida tem resultados: List[DecisaoEnriquecida]",
+        "BuscaResponseEnriquecida tem total_filtrado: int",
+        "BuscaResponseEnriquecida tem densidade: Optional[Dict[str, Any]]"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Integrar enriquecimento no BuscaService",
+      "description": "Modificar app/services/busca_service.py para adicionar enriquecimento e filtros ao m\u00e9todo buscar()",
+      "passes": true,
+      "acceptanceCriteria": [
+        "buscar() importa de app.utils.enrichment: calcular_densidade, calcular_instancia, extrair_marcadores_relevancia",
+        "buscar() importa de app.utils.filtros: filtrar_por_instancia, filtrar_relatores_ativos",
+        "buscar() usa result.get('total') para obter total (n\u00e3o paginacao.get)",
+        "buscar() aplica filtrar_por_instancia quando excluir_turmas_recursais=True",
+        "buscar() aplica filtrar_relatores_ativos quando apenas_ativos=True",
+        "buscar() calcula total_depois_filtro = len(dados) ap\u00f3s filtros",
+        "buscar() enriquece cada registro com instancia (usando dict unpacking, n\u00e3o muta\u00e7\u00e3o)",
+        "buscar() enriquece cada registro com resumo_relevancia",
+        "buscar() retorna dict com campo densidade calculado",
+        "buscar() retorna dict com total_filtrado",
+        "buscar() usa DecisaoEnriquecida(**item) para convers\u00e3o de schema",
+        "BuscaService constructor usa session e cache_manager (confirmado existente)"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Criar endpoint de busca com novos filtros",
+      "description": "Criar app/api/v1/endpoints/busca.py com endpoint POST /busca/",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Arquivo app/api/v1/endpoints/busca.py existe",
+        "Endpoint POST /busca/ existe",
+        "Endpoint usa get_session (n\u00e3o get_db) para dependency injection",
+        "Endpoint tem query param excluir_turmas_recursais: bool",
+        "Endpoint tem query param apenas_ativos: bool",
+        "Endpoint usa request.model_copy(update={...}) para adicionar query params",
+        "Endpoint cria BuscaService(session=session, cache_manager=cache)",
+        "Endpoint retorna await service.buscar(request)",
+        "Endpoint tem docstring com features listadas"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Registrar router no main.py",
+      "description": "Adicionar router de busca ao app/main.py",
+      "passes": true,
+      "acceptanceCriteria": [
+        "app/main.py importa from app.api.v1.endpoints.busca import router as busca_router",
+        "app/main.py chama app.include_router(busca_router, prefix='/api/v1')",
+        "Router aparece em /docs ou /openapi.json"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Criar testes unit\u00e1rios e de integra\u00e7\u00e3o",
+      "description": "Criar tests/test_utils/test_enrichment.py e tests/test_api/test_busca.py",
+      "passes": true,
+      "acceptanceCriteria": [
+        "tests/test_utils/test_enrichment.py existe",
+        "TestCalcularDensidade/test_escasso existe e passa",
+        "TestCalcularDensidade/test_moderado existe e passa",
+        "TestCalcularDensidade/test_consolidado existe e passa",
+        "TestCalcularDensidade/test_massivo existe e passa",
+        "TestCalcularInstancia/test_juizado_especial_turma_recursal_true existe e passa",
+        "TestCalcularInstancia/test_juizado_especial_subbase_tr existe e passa",
+        "TestCalcularInstancia/test_tjdft_2a_instancia existe e passa",
+        "pytest tests/test_utils/test_enrichment.py passa sem erros",
+        "tests/test_api/test_busca.py existe (pode usar fixtures mockados)"
+      ]
+    }
+  ]
+}

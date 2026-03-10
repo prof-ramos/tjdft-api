@@ -7,14 +7,14 @@ Provides a unified caching interface with Redis support and in-memory fallback.
 import hashlib
 import json
 import logging
-from typing import Optional, Any, Union
-from datetime import timedelta
+from typing import Any, Optional, Union
 
 logger = logging.getLogger(__name__)
 
 # Try to import Redis, but make it optional
 try:
     import redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -66,7 +66,9 @@ class CacheManager:
                 self._redis_client.ping()
                 logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
             except Exception as e:
-                logger.warning(f"Failed to connect to Redis: {e}. Using in-memory cache.")
+                logger.warning(
+                    f"Failed to connect to Redis: {e}. Using in-memory cache."
+                )
                 self._redis_client = None
         else:
             logger.info("Using in-memory cache (Redis not available)")
@@ -126,7 +128,7 @@ class CacheManager:
                     return self._deserialize(value)
             else:
                 if full_key in self._memory_cache:
-                    return self._memory_cache[full_key]
+                    return self._deserialize(self._memory_cache[full_key])
 
             return None
 
@@ -291,15 +293,17 @@ class CacheManager:
         if self._redis_client:
             try:
                 info = self._redis_client.info()
-                stats.update({
-                    "redis_version": info.get("redis_version"),
-                    "connected_clients": info.get("connected_clients"),
-                    "used_memory_human": info.get("used_memory_human"),
-                    "keyspace_count": sum(
-                        info.get(f"db{self._redis_client.db}", {}).get("keys", 0)
-                        for i in range(16)
-                    ),
-                })
+                stats.update(
+                    {
+                        "redis_version": info.get("redis_version"),
+                        "connected_clients": info.get("connected_clients"),
+                        "used_memory_human": info.get("used_memory_human"),
+                        "keyspace_count": sum(
+                            info.get(f"db{self._redis_client.db}", {}).get("keys", 0)
+                            for i in range(16)
+                        ),
+                    }
+                )
             except Exception as e:
                 logger.error(f"Error getting Redis stats: {e}")
         else:

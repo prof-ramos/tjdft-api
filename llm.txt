@@ -1,0 +1,291 @@
+Aqui está a versão revisada completa:
+
+***
+
+```markdown
+# TJDFT API — LLM Context File
+
+**Project:** FastAPI service for querying TJDFT (Tribunal de Justiça do Distrito Federal)
+jurisprudence. Wraps the public TJDFT API into a structured REST interface with caching,
+pagination, and filter validation.
+
+**Stack:** Python 3.11+, FastAPI, SQLAlchemy 2.0, Pydantic v2, httpx, Redis (falls back
+to in-memory), pytest.
+
+**Document hierarchy:**
+- This file — entry point for any LLM agent (external API reference + gotchas)
+- `CLAUDE.md` — Python development guide (project structure, commands, patterns)
+- `docs/tjdft_apis_completo.md` — Full documentation of all TJDFT public APIs
+- `docs/tjdft_api_dictionary.json` — Machine-readable reference: 228 relatores, 125
+  classes, 33 groups of órgãos julgadores with valid filter values
+
+---
+
+## Project Structure
+
+```
+app/
+├── main.py
+├── routers/              # FastAPI route handlers
+├── services/
+│   ├── tjdft_client.py   # TJDFTClient — HTTP layer (0-indexed pagination)
+│   └── busca_service.py  # BuscaService — business logic (1-indexed, has pagination bug — see Gotcha 3)
+├── utils/
+│   └── cache.py          # CacheManager (Redis + fallback in-memory)
+├── models/               # SQLAlchemy 2.0 ORM models
+└── schemas/              # Pydantic v2 request/response schemas
+data/
+└── referencia.json       # ⚠️ STALE — only 17 relatores. NEVER use for filter validation.
+docs/
+├── tjdft_api.md          # Endpoint reference, all record fields, agent notes
+├── tjdft_apis_completo.md# All TJDFT public APIs including RH (not yet implemented)
+└── tjdft_api_dictionary.json
+tests/
+├── conftest.py           # Fixtures, async_client, mock_tjdft (respx)
+├── test_busca.py
+└── test_client.py
+```
+
+---
+
+## TJDFT External API
+
+**Base URL:** `https://jurisdf.tjdft.jus.br/api/v1/pesquisa`
+
+### GET /pesquisa — Metadata (filter values)
+
+Returns valid values for filters. Use this to validate relator names before querying.
+Response keys: `relatores` (228), `revisores` (63), `designados` (200), `classes` (125),
+`orgaos` (33 groups with name variants).
+
+### POST /pesquisa — Search decisions
+
+```json
+{
+  "query": "dano moral",
+  "pagina": 0,
+  "tamanho": 20,
+  "termosAcessorios": [
+    {"campo": "nomeRelator",            "valor": "CARMEN BITTENCOURT"},
+    {"campo": "descricaoClasseCnj",     "valor": "APELAÇÃO CÍVEL"},
+    {"campo": "descricaoOrgaoJulgador", "valor": "1ª TURMA CÍVEL"},
+    {"campo": "subbase",                "valor": "decisoes-monocraticas"},
+    {"campo": "processo",               "valor": "0702180-36.2024.8.07.0001"}
+  ]
+}
+```
+
+**All valid `campo` values:** `nomeRelator`, `nomeRevisor`, `nomeRelatorDesignado`,
+`descricaoClasseCnj`, `descricaoOrgaoJulgador`, `base`, `subbase`, `processo`,
+`uuid`, `identificador`, `identificadorOrdenacao`, `origem`.
+
+**Response shape:**
+```json
+{
+  "hits": {"value": 249560},
+  "paginacao": {"pagina": 0, "tamanho": 20},
+  "agregacoes": {
+    "relator":       [{"nome": "FULANO", "total": 1234}],
+    "orgaoJulgador": [{"nome": "1 TURMA CÍVEL", "total": 67735}],
+    "classe":        [{"nome": "APELAÇÃO CÍVEL", "total": 112000}]
+  },
+  "registros": [
+    {
+      "uuid": "...",
+      "processo": "0701880-23.2024.8.07.0018",
+      "nomeRelator": "FULANO",
+      "descricaoOrgaoJulgador": "1 TURMA CÍVEL",
+      "decisao": "Nego provimento ao recurso.",
+      "ementa": "...",
+      "dataJulgamento": "2025-03-04T03:00:00.000Z",
+      "dataPublicacao": "2025-03-10T03:00:00.000Z",
+      "turmaRecursal": false,
+      "relatorAtivo": true,
+      "subbase": "acordaos"
+    }
+  ]
+}
+```
+
+**`TJDFTClient` normalizes this to:** `{registros, total, pagina, tamanho, agregacoes}`
+
+**Subbases:** `acordaos` (~444k), `acordaos-tr` (~73k Turmas Recursais),
+`decisoes-monocraticas` (~309k — different record structure, see docs/tjdft_api.md).
+
+---
+
+## Critical Gotchas
+
+1. **`nomeRelator` must be exact.** Always fetch the live metadata first via
+   `GET /pesquisa` → field `relatores`. Do NOT rely on `data/referencia.json`
+   (only 17 entries, stale). If the name is not in the 228-item list, the person
+   is likely a 1st-instance judge — search via `processo` or `query` instead.
+
+2. **Date filters are broken.** `dataJulgamento` and `dataPublicacao` as
+   `termosAcessorios` campos cause **HTTP 500** from the TJDFT server.
+   Do not use them. No workaround exists currently.
+
+3. **Pagination is 0-indexed at the API level, but 1-indexed at `BuscaService` level.**
+   - `TJDFTClient.buscar_com_filtros(pagina=0)` → first page ✓
+   - `BuscaService.buscar_com_filtro_avancado(pagina=1)` → also first page ✓
+   - BUT `BuscaService` passes `pagina` directly to `TJDFTClient` without conversion.
+     This is a known bug: calling `BuscaService` with `pagina=1` fetches API page 1
+     (second page), not page 0.
+   > ⚠️ **Do NOT fix this bug without explicit instruction.** Existing callers may
+   > already compensate for it. Changing the behavior is a breaking change.
+
+4. **Max 40 results per page.** `tamanho > 40` returns HTTP 400.
+
+5. **`query=""` (empty string) is valid** and returns all documents matching other filters.
+   Useful to list all decisions by a specific relator without a topic constraint.
+
+6. **Rejected campo names (400 error):** `revisor`, `relatorDesignado`, `segredoJustica`,
+   `q`, `ordenacao`, `direcao`. Use `nomeRevisor` and `nomeRelatorDesignado` instead.
+
+7. **`decisoes-monocraticas` has a different record structure.** Missing fields:
+   `dataJulgamento`, `decisao`, `localDePublicacao`, `relatorAtivo`, `uf`,
+   `segredoJustica`, `turmaRecursal`. Has `inteiroTeor` (string) instead of
+   `inteiroTeorHtml`, plus `jurisprudenciaEmFoco` array.
+   Always check `registro["subbase"]` before accessing these fields.
+
+8. **No sorting support.** The TJDFT API does not support custom sort order.
+   Fields `ordenacao` and `direcao` return HTTP 400.
+
+9. **Aggregations are query-scoped.** `agregacoes` always reflect the full result set
+   of the current query+filters, not just the current page. Use `tamanho=1` to fetch
+   aggregations cheaply without retrieving records.
+
+10. **`orgaos` has name variants.** The same court may appear as "1 TURMA CÍVEL",
+    "1ª TURMA CÍVEL", "1 Turma Civel". Always normalize against
+    `docs/tjdft_api_dictionary.json` → `orgaos[].variantes` before comparing.
+
+---
+
+## Error Handling
+
+Map TJDFT upstream errors to FastAPI responses consistently:
+
+| TJDFT response | Cause | Our response |
+|---|---|---|
+| HTTP 400 | Rejected campo / `tamanho > 40` | `422 Unprocessable Entity` — include list of rejected campos |
+| HTTP 500 | Date filter used (`dataJulgamento` / `dataPublicacao`) | `502 Bad Gateway` — message: `"TJDFT upstream error — date filters are not supported"` |
+| HTTP 500 (other) | Unknown upstream error | `502 Bad Gateway` — forward raw message |
+| Timeout / connection error | TJDFT unreachable | Retry once after 2s; on second failure: `503 Service Unavailable` |
+| `nomeRelator` not in metadata | Invalid filter value | `422` — include fuzzy top-3 suggestions from the 228-name list |
+
+---
+
+## Python Client Usage
+
+```python
+from app.utils.cache import CacheManager
+from app.services.tjdft_client import TJDFTClient
+
+cache = CacheManager()
+async with TJDFTClient(cache) as client:
+    # Simple search
+    result = await client.buscar_simples("tributário", pagina=0, tamanho=20)
+
+    # With filters
+    result = await client.buscar_com_filtros(
+        query="dano moral",
+        relator="CARMEN BITTENCOURT",   # must be exact
+        classe="APELAÇÃO CÍVEL",
+        orgao_julgador="1ª TURMA CÍVEL",
+        processo="0702180-36.2024.8.07.0001",
+        subbase="acordaos",
+        pagina=0,
+        tamanho=40,
+    )
+
+    # All pages (auto-paginated)
+    registros = await client.buscar_todas_paginas("locação", relator="ANA CANTARINO")
+
+    # Metadata (valid filter values — always use this, never data/referencia.json)
+    meta = await client.get_metadata()
+    relatores = meta["relatores"]  # list of 228 exact names
+```
+
+**Return shape from `TJDFTClient`:**
+`{"registros": [...], "total": int, "pagina": int, "tamanho": int, "agregacoes": {...}}`
+
+---
+
+## Not Yet Implemented
+
+The following exist in documentation but have **no service, router, or model** in the codebase yet.
+Do not assume they exist. Do not create them unless explicitly requested.
+
+- **RH APIs** — teletrabalho, estagiarios, cedidos (3 variants), servidoresNaoIntegrantes,
+  TLP1/TLP2/TLP3, matrizCargos. Documented in `docs/tjdft_apis_completo.md`.
+- **Analytics layer** — deferimento percentage, relator comparison, per-turma breakdown.
+  No `classificador.py`, no `analytics.py`, no analytics router.
+- **Cross-API joins** — e.g., linking jurisprudência relatores with RH lotação data.
+
+---
+
+## Testing Patterns
+
+- Framework: `pytest` + `pytest-asyncio`
+- HTTP mocking: `respx` (mock external TJDFT calls, never hit the real API in tests)
+- Client fixture: `async_client` from `httpx.AsyncClient` pointed at the FastAPI `app`
+
+```python
+# conftest.py pattern
+import pytest
+import respx
+import httpx
+from httpx import AsyncClient
+from app.main import app
+
+@pytest.fixture
+def mock_tjdft():
+    with respx.mock(base_url="https://jurisdf.tjdft.jus.br") as mock:
+        yield mock
+
+@pytest.fixture
+async def async_client():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        yield client
+
+# test example
+@pytest.mark.asyncio
+async def test_busca_simples(async_client, mock_tjdft):
+    mock_tjdft.post("/api/v1/pesquisa").mock(
+        return_value=httpx.Response(200, json=FIXTURE_RESPONSE)
+    )
+    resp = await async_client.get("/busca?query=dano+moral")
+    assert resp.status_code == 200
+    assert resp.json()["total"] > 0
+
+# Always test the rejection cases too
+@pytest.mark.asyncio
+async def test_relator_invalido_retorna_422(async_client, mock_tjdft):
+    mock_tjdft.get("/api/v1/pesquisa").mock(
+        return_value=httpx.Response(200, json={"relatores": ["ANA CANTARINO"]})
+    )
+    resp = await async_client.get("/busca?query=dano+moral&relator=NOME+INVALIDO")
+    assert resp.status_code == 422
+```
+
+---
+
+## References
+
+- `docs/tjdft_api.md` — Endpoint reference, all record fields, examples, agent notes
+- `docs/tjdft_apis_completo.md` — All TJDFT public APIs including RH (not yet implemented)
+- `docs/tjdft_api_dictionary.json` — All 228 relatores, 125 classes, 33 órgão groups,
+  example payloads, list of unsupported campos
+- `CLAUDE.md` — Dev setup, project structure, commit checklist, coding patterns
+```
+
+***
+
+As principais diferenças da versão original: [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/79009196/d55afb38-93bc-4f92-aca5-6f4fe2150977/tjdft_api-2.md)
+
+- **Project Structure** com aviso explícito sobre `data/referencia.json` ser stale
+- **Gotcha 3 reforçado** com o aviso "Do NOT fix without explicit instruction" para proteger contratos existentes
+- **Gotchas 9 e 10 adicionados** (agregações query-scoped e variantes de nome dos órgãos, que são armadilhas reais de desenvolvimento)
+- **Error Handling** em tabela com mapeamento direto de erros upstream → respostas FastAPI
+- **Not Yet Implemented** como seção explícita para evitar que o agente invente código que não existe
+- **Testing Patterns** com exemplo de `respx` + fixture padrão, incluindo o caso de rejeição de relator inválido

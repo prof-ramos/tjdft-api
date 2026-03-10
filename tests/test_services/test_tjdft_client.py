@@ -1,66 +1,62 @@
-"""
-Tests for TJDFT API Client.
-"""
+"""Tests for TJDFT API Client."""
+
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
 
 from app.services.tjdft_client import (
+    TJDFTAPIError,
     TJDFTClient,
-    TJDFTClientError,
     TJDFTConnectionError,
     TJDFTTimeoutError,
-    TJDFTAPIError,
 )
 from app.utils.cache import CacheManager
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
-def cache_manager():
+def cache_manager() -> CacheManager:
     """Create a cache manager for testing."""
     return CacheManager(default_ttl=3600)
 
 
 @pytest.fixture
-def mock_response():
-    """Create a mock HTTP response."""
+def mock_search_response() -> MagicMock:
+    """Create a mock HTTP response for search endpoints."""
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = {
-        "dados": [
+        "registros": [
             {
                 "numero": "12345",
-                "classe": "APELAÇÃO CÍVEL",
-                "relator": "JOÃO DA SILVA",
+                "classe": "APELACAO CIVEL",
+                "relator": "JOAO DA SILVA",
                 "ementa": "Ementa teste",
             }
         ],
-        "paginacao": {
-            "total": 1,
-            "pagina": 1,
-            "tamanho": 20,
-        }
+        "hits": {"value": 1},
+        "agregacoes": {"classes": {"APELACAO CIVEL": 1}},
     }
     response.raise_for_status = MagicMock()
     return response
 
 
 @pytest.fixture
-def mock_metadata_response():
+def mock_metadata_response() -> MagicMock:
     """Create a mock metadata response."""
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = {
-        "relatores": ["JOÃO DA SILVA", "MARIA SANTOS"],
-        "classes": ["APELAÇÃO CÍVEL", "AGRAVO DE INSTRUMENTO"],
+        "relatores": ["JOAO DA SILVA", "MARIA SANTOS"],
+        "classes": ["APELACAO CIVEL", "AGRAVO DE INSTRUMENTO"],
         "orgaos": [
             {
-                "base": "1ª TURMA CÍVEL",
+                "base": "1A TURMA CIVEL",
                 "agregador": False,
-                "items": ["1ª TURMA CÍVEL"]
+                "items": ["1A TURMA CIVEL"],
             }
-        ]
+        ],
     }
     response.raise_for_status = MagicMock()
     return response
@@ -70,247 +66,268 @@ class TestTJDFTClient:
     """Test suite for TJDFTClient."""
 
     @pytest.mark.asyncio
-    async def test_client_initialization(self, cache_manager):
-        """Test client initialization."""
+    async def test_client_initialization(self, cache_manager: CacheManager) -> None:
         client = TJDFTClient(cache_manager)
         assert client.cache == cache_manager
         assert client.client is None
 
     @pytest.mark.asyncio
-    async def test_async_context_manager(self, cache_manager):
-        """Test async context manager."""
+    async def test_async_context_manager(self, cache_manager: CacheManager) -> None:
         async with TJDFTClient(cache_manager) as client:
             assert client.client is not None
 
-        # Client should be closed after exiting context
-        assert client.client is not None  # Reference still exists but connection is closed
+        assert client.client is not None
 
     @pytest.mark.asyncio
-    async def test_buscar_simples_success(self, cache_manager, mock_response):
-        """Test simple search with successful response."""
+    async def test_buscar_simples_success(
+        self,
+        cache_manager: CacheManager,
+        mock_search_response: MagicMock,
+    ) -> None:
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.return_value = mock_response
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.return_value = mock_search_response
 
-                result = await client.buscar_simples("tributário")
+                result = await client.buscar_simples("tributario")
 
-                assert result["sucesso"] is True
-                assert len(result["dados"]) == 1
-                assert result["dados"][0]["numero"] == "12345"
-                assert result["paginacao"]["total"] == 1
+                assert result["total"] == 1
+                assert result["pagina"] == 0
+                assert result["tamanho"] == 20
+                assert len(result["registros"]) == 1
+                assert result["agregacoes"]["classes"]["APELACAO CIVEL"] == 1
 
-                # Verify request was made
-                mock_get.assert_called_once()
-                call_args = mock_get.call_args
-                assert "q" in call_args.kwargs["params"]
-                assert call_args.kwargs["params"]["q"] == "tributário"
-
-    @pytest.mark.asyncio
-    async def test_buscar_simples_empty_query(self, cache_manager):
-        """Test simple search with empty query raises error."""
-        async with TJDFTClient(cache_manager) as client:
-            with pytest.raises(ValueError, match="Query parameter cannot be empty"):
-                await client.buscar_simples("")
-
-    @pytest.mark.asyncio
-    async def test_buscar_simples_whitespace_query(self, cache_manager):
-        """Test simple search with whitespace query raises error."""
-        async with TJDFTClient(cache_manager) as client:
-            with pytest.raises(ValueError, match="Query parameter cannot be empty"):
-                await client.buscar_simples("   ")
-
-    @pytest.mark.asyncio
-    async def test_buscar_com_filtros(self, cache_manager, mock_response):
-        """Test search with filters."""
-        async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.return_value = mock_response
-
-                result = await client.buscar_com_filtros(
-                    query="tributário",
-                    relator="JOÃO DA SILVA",
-                    classe="APELAÇÃO CÍVEL",
-                    orgao_julgador="1ª TURMA CÍVEL",
-                    data_inicio="2024-01-01",
-                    data_fim="2024-12-31",
-                    pagina=2,
-                    tamanho=50
+                mock_post.assert_called_once_with(
+                    client.BASE_URL,
+                    json={"query": "tributario", "pagina": 0, "tamanho": 20},
                 )
 
-                assert result["sucesso"] is True
+    @pytest.mark.asyncio
+    async def test_buscar_simples_accepts_empty_query(
+        self,
+        cache_manager: CacheManager,
+        mock_search_response: MagicMock,
+    ) -> None:
+        async with TJDFTClient(cache_manager) as client:
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.return_value = mock_search_response
 
-                # Verify request parameters
-                call_args = mock_get.call_args
-                params = call_args.kwargs["params"]
-                assert params["q"] == "tributário"
-                assert params["relator"] == "JOÃO DA SILVA"
-                assert params["classe"] == "APELAÇÃO CÍVEL"
-                assert params["orgao_julgador"] == "1ª TURMA CÍVEL"
-                assert params["data_inicio"] == "2024-01-01"
-                assert params["data_fim"] == "2024-12-31"
-                assert params["pagina"] == 2
-                assert params["tamanho"] == 50
+                await client.buscar_simples("")
+
+                mock_post.assert_called_once_with(
+                    client.BASE_URL,
+                    json={"query": "", "pagina": 0, "tamanho": 20},
+                )
 
     @pytest.mark.asyncio
-    async def test_buscar_simples_caching(self, cache_manager, mock_response):
-        """Test that simple search results are cached."""
+    async def test_buscar_com_filtros(
+        self,
+        cache_manager: CacheManager,
+        mock_search_response: MagicMock,
+    ) -> None:
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.return_value = mock_response
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.return_value = mock_search_response
 
-                # First call - should hit API
-                result1 = await client.buscar_simples("tributário")
-                assert mock_get.call_count == 1
+                result = await client.buscar_com_filtros(
+                    query="tributario",
+                    relator="JOAO DA SILVA",
+                    classe="APELACAO CIVEL",
+                    orgao_julgador="1A TURMA CIVEL",
+                    base="acordaos",
+                    subbase="acordaos",
+                    processo="0702180-36.2024.8.07.0001",
+                    pagina=2,
+                    tamanho=50,
+                )
 
-                # Second call with same params - should use cache
-                result2 = await client.buscar_simples("tributário")
-                assert mock_get.call_count == 1  # No additional call
+                assert result["total"] == 1
 
-                # Results should be identical
+                payload = mock_post.call_args.kwargs["json"]
+                assert payload["query"] == "tributario"
+                assert payload["pagina"] == 2
+                assert payload["tamanho"] == 40
+                assert payload["termosAcessorios"] == [
+                    {"campo": "nomeRelator", "valor": "JOAO DA SILVA"},
+                    {"campo": "descricaoClasseCnj", "valor": "APELACAO CIVEL"},
+                    {"campo": "descricaoOrgaoJulgador", "valor": "1A TURMA CIVEL"},
+                    {"campo": "base", "valor": "acordaos"},
+                    {"campo": "subbase", "valor": "acordaos"},
+                    {"campo": "processo", "valor": "0702180-36.2024.8.07.0001"},
+                ]
+
+    @pytest.mark.asyncio
+    async def test_buscar_simples_caching(
+        self,
+        cache_manager: CacheManager,
+        mock_search_response: MagicMock,
+    ) -> None:
+        async with TJDFTClient(cache_manager) as client:
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.return_value = mock_search_response
+
+                result1 = await client.buscar_simples("tributario")
+                result2 = await client.buscar_simples("tributario")
+
+                assert mock_post.call_count == 1
                 assert result1 == result2
 
     @pytest.mark.asyncio
-    async def test_buscar_com_filtros_caching(self, cache_manager, mock_response):
-        """Test that filtered search results are cached."""
+    async def test_buscar_com_filtros_caching(
+        self,
+        cache_manager: CacheManager,
+        mock_search_response: MagicMock,
+    ) -> None:
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.return_value = mock_response
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.return_value = mock_search_response
 
-                # First call
-                await client.buscar_com_filtros("query", relator="JOÃO")
-                assert mock_get.call_count == 1
-
-                # Second call with same filters - should use cache
-                await client.buscar_com_filtros("query", relator="JOÃO")
-                assert mock_get.call_count == 1
-
-                # Different filter - should make new request
+                await client.buscar_com_filtros("query", relator="JOAO")
+                await client.buscar_com_filtros("query", relator="JOAO")
                 await client.buscar_com_filtros("query", relator="MARIA")
-                assert mock_get.call_count == 2
+
+                assert mock_post.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_buscar_todas_paginas(self, cache_manager):
-        """Test multi-page search."""
-        # Mock responses for 3 pages
-        responses = [
-            MagicMock(
-                status_code=200,
-                json=lambda: {
-                    "dados": [{"numero": f"{i}"} for i in range(20)],
-                    "paginacao": {"total": 50, "pagina": 1, "tamanho": 20}
-                },
-                raise_for_status=MagicMock()
-            ),
-            MagicMock(
-                status_code=200,
-                json=lambda: {
-                    "dados": [{"numero": f"{i}"} for i in range(20, 40)],
-                    "paginacao": {"total": 50, "pagina": 2, "tamanho": 20}
-                },
-                raise_for_status=MagicMock()
-            ),
-            MagicMock(
-                status_code=200,
-                json=lambda: {
-                    "dados": [{"numero": f"{i}"} for i in range(40, 50)],
-                    "paginacao": {"total": 50, "pagina": 3, "tamanho": 20}
-                },
-                raise_for_status=MagicMock()
-            ),
-        ]
-
+    async def test_buscar_todas_paginas(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.side_effect = responses
-
-                results = await client.buscar_todas_paginas(
-                    query="test",
-                    max_paginas=10
-                )
-
-                assert len(results) == 50
-                assert mock_get.call_count == 3
-
-    @pytest.mark.asyncio
-    async def test_buscar_todas_paginas_max_limit(self, cache_manager):
-        """Test multi-page search respects max_pages limit."""
-        # Mock 5 pages worth of data
-        responses = [
-            MagicMock(
-                status_code=200,
-                json=lambda page=page: {
-                    "dados": [{"numero": f"{i}"} for i in range(20)],
-                    "paginacao": {"total": 200, "pagina": page, "tamanho": 20}
-                },
-                raise_for_status=MagicMock()
-            )
-            for page in range(1, 6)
-        ]
-
-        async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.side_effect = responses
-
-                results = await client.buscar_todas_paginas(
-                    query="test",
-                    max_paginas=3  # Only fetch 3 pages
-                )
-
-                # Should only fetch 3 pages (60 results)
-                assert mock_get.call_count == 3
-
-    @pytest.mark.asyncio
-    async def test_connection_error_retry(self, cache_manager):
-        """Test retry logic on connection errors."""
-        from httpx import ConnectError
-
-        async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                # Fail first 2 times, succeed on 3rd
-                mock_get.side_effect = [
-                    ConnectError("Connection failed"),
-                    ConnectError("Connection failed"),
-                    MagicMock(
-                        status_code=200,
-                        json=lambda: {"dados": [], "paginacao": {}},
-                        raise_for_status=MagicMock()
-                    )
+            with patch.object(
+                client, "buscar_com_filtros", new_callable=AsyncMock
+            ) as mock_buscar:
+                mock_buscar.side_effect = [
+                    {
+                        "registros": [{"numero": "1"}, {"numero": "2"}],
+                        "total": 3,
+                    },
+                    {
+                        "registros": [{"numero": "3"}],
+                        "total": 3,
+                    },
                 ]
 
-                result = await client.buscar_simples("test")
-                assert result["sucesso"] is True
-                assert mock_get.call_count == 3
+                with patch(
+                    "app.services.tjdft_client.asyncio.sleep", new_callable=AsyncMock
+                ):
+                    results = await client.buscar_todas_paginas(
+                        query="test", max_paginas=10
+                    )
+
+                assert len(results) == 3
+                assert mock_buscar.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_connection_error_max_retries(self, cache_manager):
-        """Test that max retries is respected."""
+    async def test_buscar_todas_paginas_max_limit(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
+        async with TJDFTClient(cache_manager) as client:
+            with patch.object(
+                client, "buscar_com_filtros", new_callable=AsyncMock
+            ) as mock_buscar:
+                mock_buscar.return_value = {
+                    "registros": [{"numero": "1"}],
+                    "total": 10,
+                }
+
+                with patch(
+                    "app.services.tjdft_client.asyncio.sleep", new_callable=AsyncMock
+                ):
+                    results = await client.buscar_todas_paginas(
+                        query="test", max_paginas=3
+                    )
+
+                assert len(results) == 3
+                assert mock_buscar.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_connection_error_retry(
+        self,
+        cache_manager: CacheManager,
+        mock_search_response: MagicMock,
+    ) -> None:
         from httpx import ConnectError
 
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.side_effect = ConnectError("Connection failed")
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.side_effect = [
+                    ConnectError("Connection failed"),
+                    ConnectError("Connection failed"),
+                    mock_search_response,
+                ]
 
-                with pytest.raises(TJDFTConnectionError, match="Failed to connect after"):
-                    await client.buscar_simples("test")
+                with patch(
+                    "app.services.tjdft_client.asyncio.sleep", new_callable=AsyncMock
+                ):
+                    result = await client.buscar_simples("test")
 
-                # Should have tried MAX_RETRIES times
-                assert mock_get.call_count == client.MAX_RETRIES
+                assert result["total"] == 1
+                assert mock_post.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_timeout_error(self, cache_manager):
-        """Test timeout error handling."""
+    async def test_connection_error_max_retries(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
+        from httpx import ConnectError
+
+        async with TJDFTClient(cache_manager) as client:
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.side_effect = ConnectError("Connection failed")
+
+                with patch(
+                    "app.services.tjdft_client.asyncio.sleep", new_callable=AsyncMock
+                ):
+                    with pytest.raises(
+                        TJDFTConnectionError,
+                        match="Falha de conexão após 3 tentativas",
+                    ):
+                        await client.buscar_simples("test")
+
+                assert mock_post.call_count == client.MAX_RETRIES
+
+    @pytest.mark.asyncio
+    async def test_timeout_error(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
         from httpx import TimeoutException
 
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                mock_get.side_effect = TimeoutException("Request timed out")
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.side_effect = TimeoutException("Request timed out")
 
-                with pytest.raises(TJDFTTimeoutError, match="Request timed out after"):
-                    await client.buscar_simples("test")
+                with patch(
+                    "app.services.tjdft_client.asyncio.sleep", new_callable=AsyncMock
+                ):
+                    with pytest.raises(
+                        TJDFTTimeoutError,
+                        match="Timeout após 3 tentativas",
+                    ):
+                        await client.buscar_simples("test")
 
     @pytest.mark.asyncio
-    async def test_http_client_error_no_retry(self, cache_manager):
-        """Test that 4xx errors don't trigger retries."""
+    async def test_http_client_error_no_retry(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
         from httpx import HTTPStatusError
 
         response = MagicMock()
@@ -318,57 +335,98 @@ class TestTJDFTClient:
         response.text = "Bad Request"
 
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                http_error = HTTPStatusError(
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.side_effect = HTTPStatusError(
                     "Client error",
                     request=MagicMock(),
-                    response=response
+                    response=response,
                 )
-                mock_get.side_effect = http_error
 
-                with pytest.raises(TJDFTAPIError, match="API client error"):
+                with pytest.raises(TJDFTAPIError, match="Erro 400: Bad Request"):
                     await client.buscar_simples("test")
 
-                # Should not retry 4xx errors
-                assert mock_get.call_count == 1
+                assert mock_post.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_http_server_error_retry(self, cache_manager):
-        """Test that 5xx errors trigger retries."""
+    async def test_http_server_error_retry(
+        self,
+        cache_manager: CacheManager,
+        mock_search_response: MagicMock,
+    ) -> None:
         from httpx import HTTPStatusError
 
         error_response = MagicMock()
         error_response.status_code = 500
         error_response.text = "Internal Server Error"
 
-        success_response = MagicMock()
-        success_response.status_code = 200
-        success_response.json.return_value = {"dados": [], "paginacao": {}}
-        success_response.raise_for_status = MagicMock()
-
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
-                http_error = HTTPStatusError(
-                    "Server error",
-                    request=MagicMock(),
-                    response=error_response
-                )
-
-                mock_get.side_effect = [
-                    http_error,
-                    http_error,
-                    success_response
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.side_effect = [
+                    HTTPStatusError(
+                        "Server error",
+                        request=MagicMock(),
+                        response=error_response,
+                    ),
+                    HTTPStatusError(
+                        "Server error",
+                        request=MagicMock(),
+                        response=error_response,
+                    ),
+                    mock_search_response,
                 ]
 
-                result = await client.buscar_simples("test")
-                assert result["sucesso"] is True
-                assert mock_get.call_count == 3
+                with patch(
+                    "app.services.tjdft_client.asyncio.sleep", new_callable=AsyncMock
+                ):
+                    result = await client.buscar_simples("test")
+
+                assert result["total"] == 1
+                assert mock_post.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_get_metadata(self, cache_manager, mock_metadata_response):
-        """Test metadata retrieval."""
+    async def test_http_server_error_max_retries(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
+        from httpx import HTTPStatusError
+
+        error_response = MagicMock()
+        error_response.status_code = 500
+        error_response.text = "Internal Server Error"
+
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
+            with patch.object(
+                client.client, "post", new_callable=AsyncMock
+            ) as mock_post:
+                mock_post.side_effect = HTTPStatusError(
+                    "Server error",
+                    request=MagicMock(),
+                    response=error_response,
+                )
+
+                with patch(
+                    "app.services.tjdft_client.asyncio.sleep", new_callable=AsyncMock
+                ):
+                    with pytest.raises(
+                        TJDFTAPIError,
+                        match="Erro servidor 500 após 3 tentativas",
+                    ):
+                        await client.buscar_simples("test")
+
+                assert mock_post.call_count == client.MAX_RETRIES
+
+    @pytest.mark.asyncio
+    async def test_get_metadata(
+        self,
+        cache_manager: CacheManager,
+        mock_metadata_response: MagicMock,
+    ) -> None:
+        async with TJDFTClient(cache_manager) as client:
+            with patch.object(client.client, "get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_metadata_response
 
                 metadata = await client.get_metadata()
@@ -377,92 +435,42 @@ class TestTJDFTClient:
                 assert "classes" in metadata
                 assert "orgaos" in metadata
                 assert len(metadata["relatores"]) == 2
-                assert "JOÃO DA SILVA" in metadata["relatores"]
 
     @pytest.mark.asyncio
-    async def test_get_metadata_caching(self, cache_manager, mock_metadata_response):
-        """Test that metadata is cached."""
+    async def test_get_metadata_caching(
+        self,
+        cache_manager: CacheManager,
+        mock_metadata_response: MagicMock,
+    ) -> None:
         async with TJDFTClient(cache_manager) as client:
-            with patch.object(client.client, 'get', new_callable=AsyncMock) as mock_get:
+            with patch.object(client.client, "get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_metadata_response
 
-                # First call
                 await client.get_metadata()
-                assert mock_get.call_count == 1
+                await client.get_metadata()
 
-                # Second call - should use cache (24h TTL)
-                await client.get_metadata()
                 assert mock_get.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_extract_results_from_list(self, cache_manager):
-        """Test _extract_results with list response."""
+    async def test_build_cache_key(self, cache_manager: CacheManager) -> None:
         async with TJDFTClient(cache_manager) as client:
-            data = [{"id": 1}, {"id": 2}]
-            results = client._extract_results(data)
-            assert results == data
-
-    @pytest.mark.asyncio
-    async def test_extract_results_from_dict(self, cache_manager):
-        """Test _extract_results with dict response."""
-        async with TJDFTClient(cache_manager) as client:
-            data = {
-                "dados": [{"id": 1}, {"id": 2}]
-            }
-            results = client._extract_results(data)
-            assert len(results) == 2
-
-    @pytest.mark.asyncio
-    async def test_extract_results_unknown_format(self, cache_manager):
-        """Test _extract_results with unknown format."""
-        async with TJDFTClient(cache_manager) as client:
-            data = {"invalid": "format"}
-            results = client._extract_results(data)
-            assert results == []
-
-    @pytest.mark.asyncio
-    async def test_extract_pagination(self, cache_manager):
-        """Test _extract_pagination."""
-        async with TJDFTClient(cache_manager) as client:
-            data = {
-                "paginacao": {
-                    "total": 100,
-                    "pagina": 1,
-                    "tamanho": 20
-                }
-            }
-            params = {"pagina": 1, "tamanho": 20}
-
-            paginacao = client._extract_pagination(data, params)
-
-            assert paginacao["total"] == 100
-            assert paginacao["pagina"] == 1
-            assert paginacao["tamanho"] == 20
-
-    @pytest.mark.asyncio
-    async def test_build_cache_key(self, cache_manager):
-        """Test cache key generation."""
-        async with TJDFTClient(cache_manager) as client:
-            params1 = {"q": "test", "pagina": 1}
-            params2 = {"q": "test", "pagina": 1}
-            params3 = {"q": "test", "pagina": 2}
+            params1 = {"query": "test", "pagina": 1}
+            params2 = {"query": "test", "pagina": 1}
+            params3 = {"query": "test", "pagina": 2}
 
             key1 = client._build_cache_key("simples", params1)
             key2 = client._build_cache_key("simples", params2)
             key3 = client._build_cache_key("simples", params3)
 
-            # Same params should generate same key
             assert key1 == key2
-
-            # Different params should generate different key
             assert key1 != key3
-
-            # Key should contain search type
             assert "simples" in key1
 
     @pytest.mark.asyncio
-    async def test_client_without_context_manager(self, cache_manager):
-        """Test that using client without context manager raises error."""
+    async def test_client_without_context_manager(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
         client = TJDFTClient(cache_manager)
 
         with pytest.raises(RuntimeError, match="Client not initialized"):
