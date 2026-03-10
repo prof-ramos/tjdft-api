@@ -5,7 +5,11 @@ import pytest
 
 import app.services.ai_service as ai_module
 from app.config import Settings
-from app.services.ai_service import AIService, AIServiceError, AIServiceNotAvailableError
+from app.services.ai_service import (
+    AIService,
+    AIServiceError,
+    AIServiceNotAvailableError,
+)
 from app.utils.cache import CacheManager
 
 pytestmark = pytest.mark.unit
@@ -99,7 +103,7 @@ class TestPublicMethods:
         assert await ai_service.resumir_ementa("ementa válida") is None
 
     @pytest.mark.asyncio
-    async def test_resumir_ementa_parses_json_response(self, ai_service: AIService, monkeypatch):
+    async def test_resumir_ementa_parses_json_response(self, ai_service: AIService):
         ai_service.is_available = True
         ai_service._call_llm = AsyncMock(
             return_value='{"resumo":"ok","pontos_chave":["a","b"]}'
@@ -121,20 +125,26 @@ class TestPublicMethods:
         assert await ai_service.resumir_ementa("ementa válida") is None
 
     @pytest.mark.asyncio
-    async def test_extrair_teses_uses_inteiro_teor_and_parses_list(self, ai_service: AIService):
+    async def test_extrair_teses_uses_inteiro_teor_and_parses_list(
+        self, ai_service: AIService
+    ):
         ai_service.is_available = True
         ai_service._call_llm = AsyncMock(
             return_value='{"teses":[{"tese":"t1","contexto":"c1","tipo":"civil"}]}'
         )
 
-        resultado = await ai_service.extrair_teses("ementa", inteiro_teor="inteiro teor")
+        resultado = await ai_service.extrair_teses(
+            "ementa", inteiro_teor="inteiro teor"
+        )
 
         assert resultado == [{"tese": "t1", "contexto": "c1", "tipo": "civil"}]
         called_prompt = ai_service._call_llm.await_args.args[0]
         assert "Inteiro Teor" in called_prompt
 
     @pytest.mark.asyncio
-    async def test_comparar_decisoes_requires_non_empty_list(self, ai_service: AIService):
+    async def test_comparar_decisoes_requires_non_empty_list(
+        self, ai_service: AIService
+    ):
         with pytest.raises(ValueError, match="ementas list cannot be empty"):
             await ai_service.comparar_decisoes([])
 
@@ -142,7 +152,8 @@ class TestPublicMethods:
     async def test_comparar_decisoes_limits_input_size(self, ai_service: AIService):
         ai_service.is_available = True
         ai_service._call_llm = AsyncMock(
-            return_value='{"similaridades":["s"],"diferencas":["d"],"posicao_majoritaria":"p"}'
+            return_value='{"similaridades":["s"],"diferencas":["d"],'
+            '"posicao_majoritaria":"p"}'
         )
 
         resultado = await ai_service.comparar_decisoes(
@@ -166,7 +177,9 @@ class TestPublicMethods:
         assert await ai_service.sugerir_argumentos("ementa") is None
 
     @pytest.mark.asyncio
-    async def test_explicar_conceito_requires_non_empty_input(self, ai_service: AIService):
+    async def test_explicar_conceito_requires_non_empty_input(
+        self, ai_service: AIService
+    ):
         with pytest.raises(ValueError, match="Conceito cannot be empty"):
             await ai_service.explicar_conceito("")
 
@@ -175,7 +188,9 @@ class TestPublicMethods:
         ai_service.is_available = True
         ai_service._call_llm = AsyncMock(return_value="explicação pronta")
 
-        resultado = await ai_service.explicar_conceito("coisa julgada", contexto="civil")
+        resultado = await ai_service.explicar_conceito(
+            "coisa julgada", contexto="civil"
+        )
 
         assert resultado == "explicação pronta"
 

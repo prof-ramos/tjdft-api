@@ -76,7 +76,7 @@ class TestTJDFTClient:
         async with TJDFTClient(cache_manager) as client:
             assert client.client is not None
 
-        assert client.client is not None
+        assert client.client is None
 
     @pytest.mark.asyncio
     async def test_buscar_simples_success(

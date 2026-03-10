@@ -8,7 +8,11 @@ import pytest
 import app.services.busca_service as busca_module
 from app.models.decisao import Decisao
 from app.schemas.consulta import BuscaRequest
-from app.services.busca_service import BuscaService, BuscaServiceError, FiltroInvalidoError
+from app.services.busca_service import (
+    BuscaService,
+    BuscaServiceError,
+    FiltroInvalidoError,
+)
 from app.utils.cache import CacheManager
 
 pytestmark = pytest.mark.unit
@@ -105,7 +109,9 @@ class TestBuscar:
             tamanho=20,
         )
         dummy_client = DummyTJDFTClient(None)
-        dummy_client.buscar_com_filtros = AsyncMock(return_value={"dados": [], "total": 0})
+        dummy_client.buscar_com_filtros = AsyncMock(
+            return_value={"dados": [], "total": 0}
+        )
         client_factory = MagicMock(return_value=dummy_client)
         monkeypatch.setattr(busca_module, "TJDFTClient", client_factory)
         monkeypatch.setattr(busca_module, "validate_relator", lambda value: True)
@@ -190,7 +196,9 @@ class TestBuscar:
         request = BuscaRequest(query="tributário")
         dummy_client = DummyTJDFTClient(None)
         dummy_client.buscar_simples = AsyncMock(side_effect=RuntimeError("boom"))
-        monkeypatch.setattr(busca_module, "TJDFTClient", MagicMock(return_value=dummy_client))
+        monkeypatch.setattr(
+            busca_module, "TJDFTClient", MagicMock(return_value=dummy_client)
+        )
 
         with pytest.raises(BuscaServiceError, match="Erro ao realizar busca"):
             await service.buscar(request)
@@ -220,7 +228,9 @@ class TestBuscaPublicMethods:
         }
 
     @pytest.mark.asyncio
-    async def test_recuperar_busca_returns_none_for_invalid_uuid(self, service: BuscaService):
+    async def test_recuperar_busca_returns_none_for_invalid_uuid(
+        self, service: BuscaService
+    ):
         resultado = await service.recuperar_busca("not-a-uuid")
 
         assert resultado is None
@@ -237,7 +247,9 @@ class TestBuscaPublicMethods:
         assert resultado["criado_em"] == consulta_stub.criado_em.isoformat()
 
     @pytest.mark.asyncio
-    async def test_recuperar_busca_returns_none_when_not_found(self, service: BuscaService):
+    async def test_recuperar_busca_returns_none_when_not_found(
+        self, service: BuscaService
+    ):
         service.consulta_repo.get_by_id = AsyncMock(return_value=None)
 
         resultado = await service.recuperar_busca(str(uuid4()))
@@ -291,13 +303,17 @@ class TestBuscaPublicMethods:
     ):
         dummy_client = DummyTJDFTClient(None)
         dummy_client.buscar_todas_paginas = AsyncMock(side_effect=RuntimeError("boom"))
-        monkeypatch.setattr(busca_module, "TJDFTClient", MagicMock(return_value=dummy_client))
+        monkeypatch.setattr(
+            busca_module, "TJDFTClient", MagicMock(return_value=dummy_client)
+        )
 
         with pytest.raises(BuscaServiceError, match="Erro ao buscar todas as páginas"):
             await service.buscar_todas_paginas(query="tributário")
 
     @pytest.mark.asyncio
-    async def test_buscar_similares_returns_empty_when_reference_missing(self, service: BuscaService):
+    async def test_buscar_similares_returns_empty_when_reference_missing(
+        self, service: BuscaService
+    ):
         service.decisao_repo.get_by_uuid = AsyncMock(return_value=None)
 
         resultado = await service.buscar_similares("uuid-missing")
@@ -305,7 +321,9 @@ class TestBuscaPublicMethods:
         assert resultado == []
 
     @pytest.mark.asyncio
-    async def test_buscar_similares_returns_empty_when_no_filters(self, service: BuscaService):
+    async def test_buscar_similares_returns_empty_when_no_filters(
+        self, service: BuscaService
+    ):
         service.decisao_repo.get_by_uuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid_tjdft="u1",
@@ -320,7 +338,9 @@ class TestBuscaPublicMethods:
         assert resultado == []
 
     @pytest.mark.asyncio
-    async def test_buscar_similares_filters_out_reference_decision(self, service: BuscaService):
+    async def test_buscar_similares_filters_out_reference_decision(
+        self, service: BuscaService
+    ):
         service.decisao_repo.get_by_uuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid_tjdft="u1",
@@ -353,7 +373,9 @@ class TestBuscaPublicMethods:
         assert [item["uuid_tjdft"] for item in resultado] == ["u2"]
 
     @pytest.mark.asyncio
-    async def test_historico_consultas_returns_empty_for_invalid_user(self, service: BuscaService):
+    async def test_historico_consultas_returns_empty_for_invalid_user(
+        self, service: BuscaService
+    ):
         resultado = await service.historico_consultas(usuario_id="invalid-uuid")
 
         assert resultado == []
@@ -364,7 +386,9 @@ class TestBuscaPublicMethods:
     ):
         service.consulta_repo.list = AsyncMock(return_value=[consulta_stub])
 
-        resultado = await service.historico_consultas(usuario_id=str(uuid4()), limite=10)
+        resultado = await service.historico_consultas(
+            usuario_id=str(uuid4()), limite=10
+        )
 
         assert len(resultado) == 1
         assert resultado[0]["id"] == str(consulta_stub.id)
@@ -376,7 +400,9 @@ class TestBuscaHelpers:
     async def test_salvar_decisoes_cache_parses_dates_and_skips_invalid_items(
         self, service: BuscaService
     ):
-        service.decisao_repo.create_or_update = AsyncMock(side_effect=[None, RuntimeError("boom")])
+        service.decisao_repo.create_or_update = AsyncMock(
+            side_effect=[None, RuntimeError("boom")]
+        )
 
         await service._salvar_decisoes_cache(
             [
@@ -406,7 +432,9 @@ class TestBuscaHelpers:
         assert second_call["data_julgamento"] is None
 
     @pytest.mark.asyncio
-    async def test_validar_filtros_returns_input_when_valid(self, service: BuscaService, monkeypatch):
+    async def test_validar_filtros_returns_input_when_valid(
+        self, service: BuscaService, monkeypatch
+    ):
         monkeypatch.setattr(busca_module, "validate_relator", lambda value: True)
         monkeypatch.setattr(busca_module, "validate_classe", lambda value: True)
         monkeypatch.setattr(busca_module, "validate_orgao", lambda value: True)
@@ -421,7 +449,9 @@ class TestBuscaHelpers:
         assert resultado == filtros
 
     @pytest.mark.asyncio
-    async def test_validar_filtros_aggregates_errors(self, service: BuscaService, monkeypatch):
+    async def test_validar_filtros_aggregates_errors(
+        self, service: BuscaService, monkeypatch
+    ):
         monkeypatch.setattr(busca_module, "validate_relator", lambda value: False)
         monkeypatch.setattr(busca_module, "validate_classe", lambda value: False)
         monkeypatch.setattr(busca_module, "validate_orgao", lambda value: False)
@@ -472,7 +502,9 @@ class TestBuscaHelpers:
 
     @pytest.mark.asyncio
     async def test_paginar_resultados_handles_zero_tamanho(self, service: BuscaService):
-        resultado = await service._paginar_resultados(["a", "b", "c"], pagina=1, tamanho=0)
+        resultado = await service._paginar_resultados(
+            ["a", "b", "c"], pagina=1, tamanho=0
+        )
 
         assert resultado == {
             "resultados": [],
@@ -483,7 +515,9 @@ class TestBuscaHelpers:
         }
 
     @pytest.mark.asyncio
-    async def test_paginar_resultados_returns_expected_slice(self, service: BuscaService):
+    async def test_paginar_resultados_returns_expected_slice(
+        self, service: BuscaService
+    ):
         resultado = await service._paginar_resultados(
             ["a", "b", "c", "d", "e"],
             pagina=2,

@@ -102,7 +102,10 @@ class TJDFTClient:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.client:
-            await self.client.aclose()
+            try:
+                await self.client.aclose()
+            finally:
+                self.client = None
 
     async def buscar_simples(
         self,

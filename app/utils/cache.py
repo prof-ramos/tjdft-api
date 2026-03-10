@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 from typing import Any, Optional, Union
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class CacheManager:
         redis_port: int = 6379,
         redis_db: int = 0,
         redis_password: Optional[str] = None,
+        redis_url: Optional[str] = None,
         default_ttl: int = 3600,
         prefix: str = "tjdft",
     ):
@@ -43,6 +45,7 @@ class CacheManager:
             redis_port: Redis server port
             redis_db: Redis database number
             redis_password: Redis password (optional)
+            redis_url: Full Redis URL (overrides host/port/db)
             default_ttl: Default time-to-live in seconds (default: 3600 = 1 hour)
             prefix: Key prefix for cache entries
         """
@@ -53,18 +56,36 @@ class CacheManager:
 
         if REDIS_AVAILABLE:
             try:
-                self._redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    db=redis_db,
-                    password=redis_password,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                )
+                if redis_url:
+                    self._redis_client = redis.from_url(
+                        redis_url,
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5,
+                    )
+                else:
+                    self._redis_client = redis.Redis(
+                        host=redis_host,
+                        port=redis_port,
+                        db=redis_db,
+                        password=redis_password,
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5,
+                    )
                 # Test connection
                 self._redis_client.ping()
-                logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
+                # Sanitize URL for logging (remove password)
+                if redis_url:
+                    parsed = urlparse(redis_url)
+                    safe_host = (
+                        f"{parsed.hostname}:{parsed.port}"
+                        if parsed.port
+                        else parsed.hostname
+                    )
+                    logger.info(f"Connected to Redis at {safe_host}")
+                else:
+                    logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
             except Exception as e:
                 logger.warning(
                     f"Failed to connect to Redis: {e}. Using in-memory cache."
@@ -299,8 +320,7 @@ class CacheManager:
                         "connected_clients": info.get("connected_clients"),
                         "used_memory_human": info.get("used_memory_human"),
                         "keyspace_count": sum(
-                            info.get(f"db{self._redis_client.db}", {}).get("keys", 0)
-                            for i in range(16)
+                            info.get(f"db{i}", {}).get("keys", 0) for i in range(16)
                         ),
                     }
                 )

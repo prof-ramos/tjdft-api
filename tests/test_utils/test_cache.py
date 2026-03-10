@@ -38,8 +38,10 @@ class DummyRedisClient:
         return int(key in self.store)
 
     def keys(self, pattern):
-        prefix = pattern[:-1]
-        return [key for key in self.store if key.startswith(prefix)]
+        if pattern.endswith("*"):
+            prefix = pattern[:-1]
+            return [key for key in self.store if key.startswith(prefix)]
+        return [pattern] if pattern in self.store else []
 
     def info(self):
         return {
@@ -47,6 +49,7 @@ class DummyRedisClient:
             "connected_clients": 2,
             "used_memory_human": "1M",
             "db0": {"keys": 1},
+            "db1": {"keys": 2},
         }
 
     def close(self):
@@ -86,7 +89,9 @@ class TestCacheManagerMemory:
     def test_set_returns_false_on_serialize_error(self, monkeypatch):
         cache = CacheManager()
         cache._redis_client = None
-        monkeypatch.setattr(cache, "_serialize", MagicMock(side_effect=TypeError("bad")))
+        monkeypatch.setattr(
+            cache, "_serialize", MagicMock(side_effect=TypeError("bad"))
+        )
 
         assert cache.set("broken", object()) is False
 
@@ -164,7 +169,15 @@ class TestCacheManagerRedis:
         stats = cache.get_stats()
 
         assert stats["backend"] == "redis"
-        assert stats["prefix"] == "tjdft"
+        assert stats["prefix"] == cache.prefix
+
+    def test_get_stats_sums_keyspaces_across_all_dbs(self):
+        cache = CacheManager()
+        cache._redis_client = DummyRedisClient()
+
+        stats = cache.get_stats()
+
+        assert stats["keyspace_count"] == 3
 
 
 class TestCacheHelpers:

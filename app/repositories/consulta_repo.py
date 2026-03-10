@@ -1,10 +1,10 @@
 """Repository for Consulta model operations."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consulta import Consulta
@@ -88,15 +88,25 @@ class ConsultaRepository:
         Returns:
             Lista de Consultas
         """
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+        if limit <= 0:
+            raise ValueError("limit must be > 0")
+
         stmt = select(Consulta)
 
         conditions = []
         if usuario_id:
             conditions.append(Consulta.usuario_id == str(usuario_id))
         if data_inicio:
-            conditions.append(func.date(Consulta.criado_em) >= data_inicio)
+            conditions.append(
+                Consulta.criado_em >= datetime.combine(data_inicio, time.min)
+            )
         if data_fim:
-            conditions.append(func.date(Consulta.criado_em) <= data_fim)
+            conditions.append(
+                Consulta.criado_em
+                < datetime.combine(data_fim + timedelta(days=1), time.min)
+            )
 
         if conditions:
             stmt = stmt.where(and_(*conditions))
@@ -129,8 +139,6 @@ class ConsultaRepository:
         Returns:
             True se removido, False se não encontrado
         """
-        consulta = await self.get_by_id(consulta_id)
-        if consulta:
-            await self.session.delete(consulta)
-            return True
-        return False
+        stmt = delete(Consulta).where(Consulta.id == str(consulta_id))
+        result = await self.session.execute(stmt)
+        return bool(result.rowcount)
