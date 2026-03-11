@@ -1,0 +1,221 @@
+# Directory Structure
+
+```
+.claude/
+  agents/
+    api-architect.md (44 lines)
+    api-designer.md (237 lines)
+    api-documenter.md (277 lines)
+    architect-review.md (50 lines)
+    backend-architect.md (31 lines)
+    backend-developer.md (222 lines)
+    cli-developer.md (286 lines)
+    cli-ui-designer.md (405 lines)
+    documentation-engineer.md (276 lines)
+    graphql-architect.md (238 lines)
+    mcp-expert.md (259 lines)
+    prompt-engineer.md (287 lines)
+    python-pro.md (277 lines)
+    video-editor.md (37 lines)
+  commands/
+    api-endpoints.md (513 lines)
+    auth.md (775 lines)
+    database.md (657 lines)
+    deployment.md (160 lines)
+    design-rest-api.md (36 lines)
+    generate-api-documentation.md (96 lines)
+    lint.md (111 lines)
+    optimize-api-performance.md (118 lines)
+    test.md (73 lines)
+    testing.md (927 lines)
+  skills/
+    mermaid-diagrams/
+      references/
+        advanced-features.md (556 lines)
+        c4-diagrams.md (410 lines)
+        class-diagrams.md (361 lines)
+        erd-diagrams.md (510 lines)
+        flowcharts.md (450 lines)
+        sequence-diagrams.md (394 lines)
+      README.md (243 lines)
+      SKILL.md (216 lines)
+  CLAUDE_TEMPLATES_VALIDATION.md (283 lines)
+  settings.json (151 lines)
+  settings.local.json (23 lines)
+  VALIDATION_SUMMARY.md (125 lines)
+.claude.backup-2026-03-03T19-37-52/
+  agents/
+    api-architect.md (44 lines)
+    api-designer.md (237 lines)
+    api-documenter.md (277 lines)
+    architect-review.md (50 lines)
+    backend-architect.md (31 lines)
+    backend-developer.md (222 lines)
+    cli-developer.md (286 lines)
+    cli-ui-designer.md (405 lines)
+    documentation-engineer.md (276 lines)
+    graphql-architect.md (238 lines)
+    mcp-expert.md (259 lines)
+    prompt-engineer.md (287 lines)
+    python-pro.md (277 lines)
+    video-editor.md (37 lines)
+  commands/
+    design-rest-api.md (36 lines)
+    generate-api-documentation.md (96 lines)
+    optimize-api-performance.md (118 lines)
+  settings.local.json (17 lines)
+.codex/
+  config.toml (8 lines)
+.omc/
+  plans/
+    autopilot-impl.md (723 lines)
+    create-llm-txt.md (136 lines)
+    open-questions.md (15 lines)
+    quick-wins-revised.md (576 lines)
+    tjdft-analytics-cli.md (332 lines)
+    tjdft-quick-wins-revised.md (941 lines)
+  prd.json (139 lines)
+  progress.txt (78 lines)
+alembic/
+  versions/
+    001_initial.py (91 lines)
+  env.py (94 lines)
+  script.py.mako (26 lines)
+app/
+  api/
+    v1/
+      endpoints/
+        __init__.py (1 lines)
+        busca.py (54 lines)
+      __init__.py (1 lines)
+    __init__.py (1 lines)
+  core/
+    sqlite_config.py (74 lines)
+  mcp/
+    tools/
+      __init__.py (6 lines)
+      history_tools.py (153 lines)
+      search_tools.py (194 lines)
+    __init__.py (5 lines)
+    __main__.py (12 lines)
+    constants.py (57 lines)
+    errors.py (140 lines)
+    formatters.py (190 lines)
+    runtime.py (155 lines)
+    schemas.py (256 lines)
+    server.py (19 lines)
+  models/
+    __init__.py (7 lines)
+    consulta.py (33 lines)
+    decisao.py (36 lines)
+  repositories/
+    __init__.py (6 lines)
+    consulta_repo.py (145 lines)
+    decisao_repo.py (200 lines)
+  schemas/
+    __init__.py (40 lines)
+    analise.py (80 lines)
+    consulta.py (77 lines)
+    decisao.py (118 lines)
+  services/
+    __init__.py (43 lines)
+    ai_service.py (555 lines)
+    busca_service.py (668 lines)
+    estatisticas_service.py (700 lines)
+    tjdft_client.py (415 lines)
+  utils/
+    __init__.py (25 lines)
+    cache.py (456 lines)
+    enrichment.py (130 lines)
+    filtros.py (289 lines)
+  __init__.py (3 lines)
+  config.py (92 lines)
+  database.py (89 lines)
+  index.py (3 lines)
+  main.py (46 lines)
+data/
+  referencia.json (161 lines)
+docs/
+  mcp/
+    configuration.md (29 lines)
+    contract.md (171 lines)
+    example.mcp.json (10 lines)
+    quickstart.md (36 lines)
+    tool_catalog.md (228 lines)
+  api_reference.md (266 lines)
+  e2e-test-plan.md (357 lines)
+  MANUAL_TESTING_GUIDE.md (322 lines)
+  testing-backend-strategy.md (29 lines)
+  testing-taxonomy.md (26 lines)
+  tjdft_api_dictionary.json (1621 lines)
+  tjdft_api.md (305 lines)
+  tjdft_apis_completo.md (352 lines)
+tests/
+  e2e/
+    fixtures/
+      __init__.py (1 lines)
+      tjdft_api.py (61 lines)
+    __init__.py (1 lines)
+    conftest.py (171 lines)
+    test_busca_e2e.py (190 lines)
+    test_cache_e2e.py (175 lines)
+    test_database_e2e.py (226 lines)
+    test_sqlite_config_e2e.py (355 lines)
+  test_api/
+    __init__.py (0 lines)
+    test_busca.py (71 lines)
+    test_test_infra.py (15 lines)
+  test_config/
+    test_settings_env_example.py (38 lines)
+  test_mcp/
+    test_formatters.py (34 lines)
+    test_history_tools.py (85 lines)
+    test_schemas.py (25 lines)
+    test_search_tools.py (95 lines)
+  test_mcp_integration/
+    conftest.py (15 lines)
+    test_stdio_core.py (25 lines)
+  test_repositories/
+    __init__.py (0 lines)
+    test_consulta_repo.py (136 lines)
+  test_services/
+    __init__.py (0 lines)
+    test_ai_service.py (292 lines)
+    test_busca_service.py (528 lines)
+    test_estatisticas_service.py (460 lines)
+    test_tjdft_client.py (477 lines)
+  test_utils/
+    __init__.py (0 lines)
+    test_cache.py (358 lines)
+    test_enrichment.py (146 lines)
+    test_filtros.py (159 lines)
+  __init__.py (1 lines)
+  conftest.py (78 lines)
+  test_main.py (28 lines)
+.dockerignore (71 lines)
+.env.example (22 lines)
+.flake8 (3 lines)
+.gitignore (88 lines)
+.mcp.json (83 lines)
+AGENTS.md (31 lines)
+alembic.ini (89 lines)
+ARCHITECTURE.md (429 lines)
+CLAUDE.md (109 lines)
+deploy-swarm.sh (79 lines)
+DEPLOYMENT.md (192 lines)
+DEVELOPMENT.md (411 lines)
+docker-compose.dev.yml (60 lines)
+docker-compose.swarm.yml (103 lines)
+docker-compose.yml (79 lines)
+Dockerfile (84 lines)
+llm.txt (294 lines)
+Makefile (82 lines)
+nginx.conf.example (100 lines)
+pyproject.toml (82 lines)
+README.md (333 lines)
+requirements-dev.txt (16 lines)
+requirements.txt (25 lines)
+test-pyramid-plan.md (178 lines)
+tjdft-mcp-plan.md (267 lines)
+vercel.json (8 lines)
+```

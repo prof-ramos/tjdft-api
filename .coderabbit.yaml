@@ -1,0 +1,295 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "pt-BR"
+
+tone_instructions: "Como um tio do pavê — direto, prático e sem enrolação, mas sempre prestativo."
+
+early_access: true
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+
+  high_level_summary: true
+  high_level_summary_in_walkthrough: false
+  high_level_summary_instructions: >
+    Gere um resumo conciso em português (pt-BR) destacando:
+    impacto na performance, alterações na lógica de cache/Redis,
+    mudanças em endpoints FastAPI e riscos de regressão.
+
+  auto_title_instructions: "Título no formato Conventional Commits (feat/fix/perf/refactor/test/docs), em inglês, máximo 72 caracteres."
+
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+
+  suggested_labels: true
+  auto_apply_labels: true
+  labeling_instructions:
+    - label: "performance"
+      instructions: "Aplicar quando o PR contém otimizações de performance, cache ou redução de latência."
+    - label: "cache"
+      instructions: "Aplicar quando há mudanças em app/utils/cache.py ou lógica de Redis/in-memory cache."
+    - label: "api"
+      instructions: "Aplicar quando há alterações em app/api/ ou nos schemas de resposta."
+    - label: "tests"
+      instructions: "Aplicar quando o PR adiciona ou modifica testes em tests/."
+    - label: "refactor"
+      instructions: "Aplicar quando há refatoração sem mudança de comportamento externo."
+    - label: "bug"
+      instructions: "Aplicar quando o PR corrige um bug ou comportamento incorreto."
+
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+
+  poem: true
+  in_progress_fortune: true
+  enable_prompt_for_ai_agents: true
+
+  abort_on_close: true
+  disable_cache: false
+
+  # Excluir arquivos que não precisam de revisão de código
+  path_filters:
+    - "!alembic/versions/**"
+    - "!data/**"
+    - "!docs/**"
+    - "!uv.lock"
+    - "!**/__pycache__/**"
+    - "!**/*.pyc"
+
+  path_instructions:
+    - path: "app/api/**/*.py"
+      instructions: |
+        Revisar endpoints FastAPI com foco em:
+        - Validação correta dos parâmetros de entrada (Pydantic).
+        - Tratamento de erros HTTP com status codes adequados.
+        - Uso de dependências (Depends) para injeção de cache e serviços.
+        - Evitar lógica de negócio diretamente no endpoint; delegar para services.
+        - Verificar se o singleton get_cache() está sendo usado (não CacheManager() direto).
+
+    - path: "app/services/**/*.py"
+      instructions: |
+        Revisar serviços com foco em:
+        - Separação clara de responsabilidades.
+        - Tratamento de exceções e fallback adequado.
+        - Verificar se processamento paralelo (asyncio.gather) é realmente necessário ou se list comprehension síncrona é suficiente.
+        - Confirmar que dados enriquecidos não mutam estado externo inesperadamente.
+
+    - path: "app/utils/cache.py"
+      instructions: |
+        Revisar a implementação de cache com atenção especial a:
+        - Lazy loading do Redis: garantir que _check_connection() é chamado antes de qualquer operação.
+        - LRU com OrderedDict: verificar move_to_end() no get e eviction no set (limite 1000 itens).
+        - Thread-safety: avaliar se há risco de race condition em ambiente assíncrono.
+        - Fallback para in-memory deve ser silencioso e logar adequadamente.
+
+    - path: "app/utils/filtros.py"
+      instructions: |
+        Revisar lógica de filtros e cache de referência:
+        - Confirmar que REFERENCIA_DATA_CACHE_KEY é usado consistentemente.
+        - TTL de 86400s (24h): verificar se faz sentido para os dados de referência.
+        - clear_referencia_cache() deve invalidar via cache manager, não memória local.
+
+    - path: "app/models/**/*.py"
+      instructions: |
+        Revisar modelos SQLAlchemy com foco em:
+        - Tipos de coluna adequados e índices necessários.
+        - Relacionamentos e lazy loading configurados corretamente.
+        - Compatibilidade com as migrations do Alembic.
+
+    - path: "alembic/versions/**/*.py"
+      instructions: |
+        Revisar migrations com atenção a:
+        - Reversibilidade (downgrade implementado).
+        - Risco de perda de dados em ALTER TABLE.
+        - Consistência com os modelos em app/models/.
+
+    - path: "tests/**/*.py"
+      instructions: |
+        Revisar testes com foco em:
+        - Cobertura dos caminhos feliz e de erro.
+        - Uso adequado de mocks para Redis e banco de dados (sem dependências externas reais).
+        - Testes de integração em tests/e2e/ devem documentar pré-requisitos (Redis rodando, etc.).
+        - Fixtures reutilizáveis em conftest.py.
+        - Nomenclatura descritiva: test_<funcionalidade>_<cenário>_<resultado_esperado>.
+
+    - path: "app/config.py"
+      instructions: |
+        Verificar que variáveis sensíveis (senhas, URLs de Redis, tokens) nunca
+        têm valores padrão hardcoded. Devem obrigatoriamente vir de variáveis de ambiente.
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 5
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "wip"
+      - "DO NOT MERGE"
+
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+    simplify:
+      enabled: true
+
+  pre_merge_checks:
+    docstrings:
+      mode: warning
+      threshold: 70
+    title:
+      mode: warning
+      requirements: "Deve seguir Conventional Commits (feat/fix/perf/refactor/test/docs) em inglês."
+    description:
+      mode: warning
+    issue_assessment:
+      mode: warning
+
+  tools:
+    # Python
+    ruff:
+      enabled: true
+    flake8:
+      enabled: true
+    pylint:
+      enabled: true
+    # Segurança
+    semgrep:
+      enabled: true
+    opengrep:
+      enabled: true
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    osvScanner:
+      enabled: true
+    # Infra / CI
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    actionlint:
+      enabled: true
+    github-checks:
+      enabled: true
+      timeout_ms: 90000
+    dotenvLint:
+      enabled: true
+    # AST
+    ast-grep:
+      essential_rules: true
+    # Desabilitar ferramentas não relevantes para este projeto Python
+    biome:
+      enabled: false
+    eslint:
+      enabled: false
+    oxc:
+      enabled: false
+    swiftlint:
+      enabled: false
+    phpstan:
+      enabled: false
+    phpmd:
+      enabled: false
+    phpcs:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    rubocop:
+      enabled: false
+    brakeman:
+      enabled: false
+    detekt:
+      enabled: false
+    buf:
+      enabled: false
+    regal:
+      enabled: false
+    clang:
+      enabled: false
+    cppcheck:
+      enabled: false
+    clippy:
+      enabled: false
+    prismaLint:
+      enabled: false
+    shopifyThemeCheck:
+      enabled: false
+    luacheck:
+      enabled: false
+    smartyLint:
+      enabled: false
+    emberTemplateLint:
+      enabled: false
+    psscriptanalyzer:
+      enabled: false
+    fortitudeLint:
+      enabled: false
+    checkmake:
+      enabled: false
+    blinter:
+      enabled: false
+    htmlhint:
+      enabled: false
+    stylelint:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    tflint:
+      enabled: false
+    checkov:
+      enabled: false
+    trivy:
+      enabled: false
+    circleci:
+      enabled: false
+    hadolint:
+      enabled: false
+    pmd:
+      enabled: false
+
+chat:
+  art: true
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - "AGENTS.md"
+      - "README.md"
+  learnings:
+    scope: local
+  pull_requests:
+    scope: local
+
+code_generation:
+  docstrings:
+    language: "pt-BR"
+    path_instructions:
+      - path: "app/**/*.py"
+        instructions: |
+          Gere docstrings no estilo Google (Args, Returns, Raises) em português (pt-BR).
+          Para endpoints FastAPI, inclua descrição do contrato HTTP (parâmetros, resposta, erros).
+  unit_tests:
+    path_instructions:
+      - path: "app/**/*.py"
+        instructions: |
+          Gere testes com pytest. Use unittest.mock or pytest-mock para mockar Redis e banco.
+          Siga a estrutura existente em tests/ (test_api/, test_services/, test_utils/).
+          Nomeie os testes como: test_<funcionalidade>_<cenário>_<resultado_esperado>.
