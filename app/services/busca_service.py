@@ -144,20 +144,20 @@ class BuscaService:
             total_depois_filtro = len(dados)
 
             # 6. Enrich data with instancia and relevance summary
-            dados_enriquecidos = []
-            for registro in dados:
-                instancia = calcular_instancia(
-                    turma_recursal=registro.get("turmaRecursal"),
-                    subbase=registro.get("subbase"),
-                )
-                resumo = extrair_marcadores_relevancia(registro.get("marcadores"))
-                # Use dict unpacking (no in-place mutation)
-                enriched = {
+            # Using list comprehension since enrichment functions are synchronous
+            dados_enriquecidos = [
+                {
                     **registro,
-                    "instancia": instancia,
-                    "resumo_relevancia": resumo,
+                    "instancia": calcular_instancia(
+                        turma_recursal=registro.get("turmaRecursal"),
+                        subbase=registro.get("subbase"),
+                    ),
+                    "resumo_relevancia": extrair_marcadores_relevancia(
+                        registro.get("marcadores")
+                    ),
                 }
-                dados_enriquecidos.append(enriched)
+                for registro in dados
+            ]
 
             # 7. Calculate density metrics
             densidade = calcular_densidade(total_antes_filtro)

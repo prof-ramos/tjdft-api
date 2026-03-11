@@ -2,9 +2,10 @@
 
 import uuid
 from datetime import date, datetime, time, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy import and_, delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consulta import Consulta
@@ -140,5 +141,5 @@ class ConsultaRepository:
             True se removido, False se não encontrado
         """
         stmt = delete(Consulta).where(Consulta.id == str(consulta_id))
-        result = await self.session.execute(stmt)
+        result = cast(CursorResult[Any], await self.session.execute(stmt))
         return bool(result.rowcount)

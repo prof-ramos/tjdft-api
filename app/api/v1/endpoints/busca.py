@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.schemas.consulta import BuscaRequest, BuscaResponseEnriquecida
 from app.services.busca_service import BuscaService
-from app.utils.cache import CacheManager
+from app.utils.cache import get_cache
 
 router = APIRouter(prefix="/busca", tags=["Busca"])
 
@@ -48,7 +48,7 @@ async def buscar_decisoes(
         }
     )
 
-    cache = CacheManager()
+    cache = get_cache()
     service = BuscaService(session=session, cache_manager=cache)
 
     return await service.buscar(request)

@@ -1,3 +1,4 @@
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -142,6 +143,9 @@ class TestCacheManagerRedis:
 
         cache = CacheManager()
 
+        # With lazy loading, need to trigger a cache operation to check connection
+        cache.set("test", {"value": 1})
+
         assert cache._redis_client is None
 
     def test_redis_backend_roundtrip_and_close(self):
@@ -196,3 +200,159 @@ class TestCacheHelpers:
         cache2 = get_cache()
 
         assert cache1 is cache2
+
+
+class TestCacheManagerLRU:
+    """Test LRU cache eviction for in-memory backend."""
+
+    def test_lru_eviction_when_limit_exceeded(self):
+        """Test that oldest entries are removed when cache limit is exceeded."""
+        cache = CacheManager()
+        cache._redis_client = None
+        cache._max_memory_items = 3  # Set small limit for testing
+
+        # Fill cache to limit
+        cache.set("key1", {"value": 1})
+        cache.set("key2", {"value": 2})
+        cache.set("key3", {"value": 3})
+
+        assert cache.exists("key1") is True
+        assert cache.exists("key2") is True
+        assert cache.exists("key3") is True
+
+        # Add one more item - should evict oldest (key1)
+        cache.set("key4", {"value": 4})
+
+        assert cache.exists("key1") is False  # Evicted
+        assert cache.exists("key2") is True
+        assert cache.exists("key3") is True
+        assert cache.exists("key4") is True
+
+    def test_lru_recency_update_on_existing_key(self):
+        """Test that accessing/moving existing key updates its recency."""
+        cache = CacheManager()
+        cache._redis_client = None
+        cache._max_memory_items = 3
+
+        cache.set("key1", {"value": 1})
+        cache.set("key2", {"value": 2})
+        cache.set("key3", {"value": 3})
+
+        # Access key1 (should make it most recently used)
+        cache.get("key1")
+
+        # Add new item - should evict key2 (oldest after key1 access)
+        cache.set("key4", {"value": 4})
+
+        assert cache.exists("key1") is True  # Still present (accessed)
+        assert cache.exists("key2") is False  # Evicted (oldest)
+        assert cache.exists("key3") is True
+        assert cache.exists("key4") is True
+
+    def test_exists_removes_expired_entry_from_memory_cache(self):
+        """Test that exists() honors TTL expiration in memory backend."""
+        cache = CacheManager()
+        cache._redis_client = None
+
+        cache.set("key1", {"value": 1}, ttl=1)
+
+        assert cache.exists("key1") is True
+
+        time.sleep(1.1)
+
+        assert cache.exists("key1") is False
+        assert cache.get("key1") is None
+
+    def test_lru_recency_update_on_set_existing_key(self):
+        """Test that updating existing key updates its recency."""
+        cache = CacheManager()
+        cache._redis_client = None
+        cache._max_memory_items = 3
+
+        cache.set("key1", {"value": 1})
+        cache.set("key2", {"value": 2})
+        cache.set("key3", {"value": 3})
+
+        # Update key1 (should make it most recently used)
+        cache.set("key1", {"value": 10})
+
+        # Add new item - should evict key2 (oldest after key1 update)
+        cache.set("key4", {"value": 4})
+
+        assert cache.exists("key1") is True  # Still present (updated)
+        assert cache.exists("key2") is False  # Evicted (oldest)
+        assert cache.exists("key3") is True
+        assert cache.exists("key4") is True
+
+
+class TestCacheManagerLazyLoading:
+    """Test lazy loading of Redis connection."""
+
+    def test_connection_checked_on_first_get(self):
+        """Test that Redis connection is checked on first get() call."""
+        cache = CacheManager()
+        fake_client = DummyRedisClient()
+        cache._redis_client = fake_client
+
+        # Connection should not be checked during __init__
+        assert cache._connection_checked is False
+
+        # First get should trigger connection check
+        cache.get("test")
+
+        assert cache._connection_checked is True
+
+    def test_connection_checked_on_first_set(self):
+        """Test that Redis connection is checked on first set() call."""
+        cache = CacheManager()
+        fake_client = DummyRedisClient()
+        cache._redis_client = fake_client
+
+        assert cache._connection_checked is False
+
+        # First set should trigger connection check
+        cache.set("test", {"value": 1})
+
+        assert cache._connection_checked is True
+
+    def test_connection_checked_on_first_delete(self):
+        """Test that Redis connection is checked on first delete() call."""
+        cache = CacheManager()
+        fake_client = DummyRedisClient()
+        cache._redis_client = fake_client
+
+        assert cache._connection_checked is False
+
+        # First delete should trigger connection check
+        cache.delete("test")
+
+        assert cache._connection_checked is True
+
+    def test_connection_checked_on_first_exists(self):
+        """Test that Redis connection is checked on first exists() call."""
+        cache = CacheManager()
+        fake_client = DummyRedisClient()
+        cache._redis_client = fake_client
+
+        assert cache._connection_checked is False
+
+        # First exists should trigger connection check
+        cache.exists("test")
+
+        assert cache._connection_checked is True
+
+    def test_lazy_loading_falls_back_to_memory_on_ping_failure(self, monkeypatch):
+        """Test that failed ping falls back to memory cache."""
+        cache = CacheManager()
+        failing_client = DummyRedisClient()
+        failing_client.ping = MagicMock(side_effect=RuntimeError("offline"))
+        cache._redis_client = failing_client
+
+        assert cache._connection_checked is False
+
+        # First operation should trigger ping and fallback
+        cache.set("test", {"value": 1})
+
+        assert cache._connection_checked is True
+        assert cache._redis_client is None  # Fallback to memory
+        assert cache.get("test") == {"value": 1}  # Should still work

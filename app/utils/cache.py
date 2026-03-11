@@ -7,6 +7,9 @@ Provides a unified caching interface with Redis support and in-memory fallback.
 import hashlib
 import json
 import logging
+import threading
+import time
+from collections import OrderedDict
 from typing import Any, Optional, Union
 from urllib.parse import urlparse
 
@@ -52,7 +55,10 @@ class CacheManager:
         self.default_ttl = default_ttl
         self.prefix = prefix
         self._redis_client: Optional[Any] = None
-        self._memory_cache: dict = {}
+        self._memory_cache: OrderedDict = OrderedDict()
+        self._max_memory_items = 1000  # LRU limit for in-memory cache
+        self._connection_checked = False
+        self._connection_lock = threading.Lock()  # Protects _check_connection()
 
         if REDIS_AVAILABLE:
             try:
@@ -73,8 +79,7 @@ class CacheManager:
                         socket_connect_timeout=5,
                         socket_timeout=5,
                     )
-                # Test connection
-                self._redis_client.ping()
+                # Defer connection check to first use (lazy loading)
                 # Sanitize URL for logging (remove password)
                 if redis_url:
                     parsed = urlparse(redis_url)
@@ -83,12 +88,12 @@ class CacheManager:
                         if parsed.port
                         else parsed.hostname
                     )
-                    logger.info(f"Connected to Redis at {safe_host}")
+                    logger.info(f"Redis client configured for {safe_host}")
                 else:
-                    logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
+                    logger.info(f"Redis client configured for {redis_host}:{redis_port}")
             except Exception as e:
                 logger.warning(
-                    f"Failed to connect to Redis: {e}. Using in-memory cache."
+                    f"Failed to configure Redis: {e}. Using in-memory cache."
                 )
                 self._redis_client = None
         else:
@@ -105,6 +110,37 @@ class CacheManager:
             Full key with prefix
         """
         return f"{self.prefix}:{key}"
+
+    def _check_connection(self) -> None:
+        """
+        Check Redis connection on first use (lazy loading).
+
+        This method is called on the first cache operation to verify
+        that the Redis connection is working. If not, it falls back
+        to in-memory cache.
+
+        Uses threading.Lock to prevent race condition when multiple
+        threads call this method concurrently.
+        """
+        if self._connection_checked or not self._redis_client:
+            return
+
+        with self._connection_lock:
+            # Double-check after acquiring lock
+            if self._connection_checked or not self._redis_client:
+                return
+
+            try:
+                self._redis_client.ping()
+                self._connection_checked = True
+                logger.debug("Redis connection verified on first use")
+            except Exception as e:
+                logger.warning(
+                    f"Redis connection check failed on first use: {e}. "
+                    "Falling back to in-memory cache."
+                )
+                self._redis_client = None
+                self._connection_checked = True
 
     def _serialize(self, value: Any) -> str:
         """
@@ -138,8 +174,11 @@ class CacheManager:
             key: Cache key (without prefix)
 
         Returns:
-            Cached value or None if not found
+            Cached value or None if not found or expired
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
 
         try:
@@ -149,7 +188,22 @@ class CacheManager:
                     return self._deserialize(value)
             else:
                 if full_key in self._memory_cache:
-                    return self._deserialize(self._memory_cache[full_key])
+                    entry = self._memory_cache[full_key]
+                    # Check if expired (entry is tuple of (expiration_time, value))
+                    if isinstance(entry, tuple):
+                        expiration_time, serialized_value = entry
+                        if time.time() > expiration_time:
+                            # Entry expired, remove it
+                            del self._memory_cache[full_key]
+                            logger.debug(f"Cache entry expired: {full_key}")
+                            return None
+                        # Move to end (most recently used)
+                        self._memory_cache.move_to_end(full_key)
+                        return self._deserialize(serialized_value)
+                    else:
+                        # Legacy entry without expiration, return as-is
+                        self._memory_cache.move_to_end(full_key)
+                        return self._deserialize(entry)
 
             return None
 
@@ -174,6 +228,9 @@ class CacheManager:
         Returns:
             True if successful, False otherwise
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
         ttl = ttl if ttl is not None else self.default_ttl
 
@@ -183,7 +240,22 @@ class CacheManager:
             if self._redis_client:
                 self._redis_client.setex(full_key, ttl, serialized_value)
             else:
-                self._memory_cache[full_key] = serialized_value
+                # Calculate expiration time
+                expiration_time = time.time() + ttl
+
+                # If key already exists, move to end (most recently used)
+                if full_key in self._memory_cache:
+                    self._memory_cache.move_to_end(full_key)
+
+                # Add to cache as tuple of (expiration_time, serialized_value)
+                self._memory_cache[full_key] = (expiration_time, serialized_value)
+                # Enforce LRU limit - remove oldest if over limit
+                if len(self._memory_cache) > self._max_memory_items:
+                    self._memory_cache.popitem(last=False)
+                    logger.debug(
+                        f"LRU cache limit reached ({self._max_memory_items}), "
+                        "oldest entry removed"
+                    )
 
             logger.debug(f"Cached key: {full_key} (TTL: {ttl}s)")
             return True
@@ -202,6 +274,9 @@ class CacheManager:
         Returns:
             True if successful, False otherwise
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
 
         try:
@@ -220,21 +295,36 @@ class CacheManager:
 
     def exists(self, key: str) -> bool:
         """
-        Check if key exists in cache.
+        Check if key exists in cache and is not expired.
 
         Args:
             key: Cache key (without prefix)
 
         Returns:
-            True if key exists, False otherwise
+            True if key exists and is not expired, False otherwise
         """
+        # Check connection on first use (lazy loading)
+        self._check_connection()
+
         full_key = self._build_key(key)
 
         try:
             if self._redis_client:
                 return bool(self._redis_client.exists(full_key))
             else:
-                return full_key in self._memory_cache
+                if full_key not in self._memory_cache:
+                    return False
+
+                # Check if expired (entry is tuple of (expiration_time, value))
+                entry = self._memory_cache[full_key]
+                if isinstance(entry, tuple):
+                    expiration_time, _ = entry
+                    if time.time() > expiration_time:
+                        # Entry expired, remove it
+                        del self._memory_cache[full_key]
+                        logger.debug(f"Cache entry expired on exists(): {full_key}")
+                        return False
+                return True
 
         except Exception as e:
             logger.error(f"Error checking cache key {key}: {e}")
@@ -345,16 +435,22 @@ class CacheManager:
 
 # Global cache instance
 _cache_instance: Optional[CacheManager] = None
+_cache_lock = threading.Lock()
 
 
 def get_cache() -> CacheManager:
     """
     Get global cache manager instance.
 
+    Uses double-checked locking pattern for thread safety.
+
     Returns:
         CacheManager instance
     """
     global _cache_instance
     if _cache_instance is None:
-        _cache_instance = CacheManager()
+        with _cache_lock:
+            # Double-check after acquiring lock
+            if _cache_instance is None:
+                _cache_instance = CacheManager()
     return _cache_instance
