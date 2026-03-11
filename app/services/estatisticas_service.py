@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.decisao import Decisao
-from app.repositories.consulta_repo import ConsultaRepository
-from app.repositories.decisao_repo import DecisaoRepository
+from app.repositories.consulta_repository import ConsultaRepository
+from app.repositories.decisao_repository import DecisaoRepository
 
 
 class EstatisticasService:

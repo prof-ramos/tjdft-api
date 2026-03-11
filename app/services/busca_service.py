@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories.consulta_repo import ConsultaRepository
-from app.repositories.decisao_repo import DecisaoRepository
+from app.repositories.consulta_repository import ConsultaRepository
+from app.repositories.decisao_repository import DecisaoRepository
 from app.schemas.consulta import BuscaRequest
 from app.schemas.consulta import DecisaoResponse as ConsultaDecisaoResponse
 from app.schemas.decisao import DecisaoEnriquecida
