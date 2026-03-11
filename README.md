@@ -27,18 +27,18 @@ Esta API fornece uma interface moderna e assíncrona para busca de jurisprudênc
 git clone https://github.com/prof-ramos/tjdft-api.git
 cd tjdft-api
 
-# Criar ambiente virtual
-python -m venv venv
-source venv/bin/activate
+# Criar e ativar ambiente virtual
+uv venv .venv
+source .venv/bin/activate
 
 # Instalar dependências
-pip install -r requirements.txt
+uv pip install -e ".[dev]"
 
 # Configurar ambiente
 cp .env.example .env
 
 # Rodar servidor
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 ### Docker (Recomendado)
@@ -69,37 +69,59 @@ docker run -p 8000:8000 -e DATABASE_URL="sqlite+aiosqlite:////app/data/tjdft.db"
 
 ## 📡 Endpoints
 
+### Root
+```http
+GET /
+```
+
 ### Health Check
 ```http
 GET /health
 ```
 
-### Busca Simples
+### Busca de decisões
 ```http
-GET /api/v1/busca?q=tributário&pagina=1&tamanho=20
+POST /api/v1/busca/
 ```
 
-### Busca com Filtros
-```http
-GET /api/v1/busca/filtros?q=tributário&relator=Nome&classe=Apelação
-```
+Use `application/json` no corpo e, opcionalmente, os query params
+`excluir_turmas_recursais` e `apenas_ativos`.
 
 ## 🧪 Exemplos de Uso com curl
 
-Após iniciar o servidor com `uvicorn app.main:app --reload`:
+Após iniciar o servidor com `uv run uvicorn app.main:app --reload`:
 
 ```bash
 # Health check
 curl http://localhost:8000/health
 
-# Busca simples
-curl "http://localhost:8000/api/v1/busca?q=tributario&pagina=1&tamanho=10"
+# Busca básica
+curl -X POST "http://localhost:8000/api/v1/busca/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "tributário",
+    "pagina": 1,
+    "tamanho": 10
+  }'
 
-# Busca com filtros (URL encoded)
-curl "http://localhost:8000/api/v1/busca/filtros?q=tributario&relator=Nome%20do%20Relator&classe=Apelacao"
+# Busca com filtros e query params opcionais
+curl -X POST "http://localhost:8000/api/v1/busca/?apenas_ativos=true" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "tributário",
+    "filtros": {
+      "relator": "desembargador-faustolo",
+      "classe": "APC",
+      "orgao_julgador": "6CC"
+    },
+    "pagina": 1,
+    "tamanho": 5
+  }'
 
 # Resposta formatada com jq
-curl -s "http://localhost:8000/api/v1/busca?q=tributario&pagina=1&tamanho=5" | jq .
+curl -s -X POST "http://localhost:8000/api/v1/busca/" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"tributário","pagina":1,"tamanho":5}' | jq .
 ```
 
 ## 📖 Documentação
@@ -107,18 +129,20 @@ curl -s "http://localhost:8000/api/v1/busca?q=tributario&pagina=1&tamanho=5" | j
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 - **OpenAPI**: http://localhost:8000/openapi.json
+- **Referência da API do projeto**: [docs/api_reference.md](docs/api_reference.md)
+- **API pública original do TJDFT usada como fonte de dados**: [docs/tjdft_api.md](docs/tjdft_api.md)
 
 ## 🧪 Testes
 
 ```bash
 # Rodar todos os testes
-pytest
+uv run pytest
 
 # Com cobertura
-pytest --cov=app --cov-report=html
+uv run pytest --cov=app --cov-report=html
 
 # Teste específico
-pytest tests/test_services/test_tjdft_client.py -v
+uv run pytest tests/test_services/test_tjdft_client.py -v
 ```
 
 ## 🔧 Desenvolvimento
@@ -127,13 +151,13 @@ pytest tests/test_services/test_tjdft_client.py -v
 
 ```bash
 # Formatar
-black .
-isort .
+uv run black .
+uv run isort .
 
 # Verificar
-black --check .
-flake8 app/
-mypy app/
+uv run black --check .
+uv run flake8 app/
+uv run mypy app/
 ```
 
 ### Estrutura do Projeto
