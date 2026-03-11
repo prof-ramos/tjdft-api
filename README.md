@@ -54,6 +54,24 @@ GET /api/v1/busca?q=tributário&pagina=1&tamanho=20
 GET /api/v1/busca/filtros?q=tributário&relator=Nome&classe=Apelação
 ```
 
+## 🧪 Exemplos de Uso com curl
+
+Após iniciar o servidor com `uvicorn app.main:app --reload`:
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Busca simples
+curl "http://localhost:8000/api/v1/busca?q=tributario&pagina=1&tamanho=10"
+
+# Busca com filtros (URL encoded)
+curl "http://localhost:8000/api/v1/busca/filtros?q=tributario&relator=Nome%20do%20Relator&classe=Apelacao"
+
+# Resposta formatada com jq
+curl -s "http://localhost:8000/api/v1/busca?q=tributario&pagina=1&tamanho=5" | jq .
+```
+
 ## 📖 Documentação
 
 - **Swagger UI**: http://localhost:8000/docs

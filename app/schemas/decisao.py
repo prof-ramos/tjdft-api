@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DecisaoBase(BaseModel):
@@ -34,6 +34,14 @@ class DecisaoBase(BaseModel):
     classe: Optional[str] = Field(
         None, alias="descricaoClasseCnj", description="Process class/type"
     )
+
+    @field_validator('data_julgamento', 'data_publicacao', mode='before')
+    @classmethod
+    def parse_datetime_to_date(cls, v):
+        """Convert datetime strings to date (API externa retorna datetime)."""
+        if isinstance(v, str) and 'T' in v:
+            return v.split('T')[0]
+        return v
 
     model_config = {"from_attributes": True, "populate_by_name": True}
 
