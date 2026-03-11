@@ -5,6 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/docker-gabrielramosprof%2Ftjdft--latest-blue.svg)](https://hub.docker.com/r/gabrielramosprof/tjdft-api)
 
 ## 🎯 Sobre
 
@@ -15,8 +16,11 @@ Esta API fornece uma interface moderna e assíncrona para busca de jurisprudênc
 - 💾 **Cache inteligente** com Redis
 - 🔄 **Async/await** para alta performance
 - 📊 **Análise** de decisões judiciais
+- 🐳 **Docker multi-arch** (AMD64/ARM64) para deploy facilitado
 
 ## 🚀 Quick Start
+
+### Local (Python)
 
 ```bash
 # Clonar repositório
@@ -36,6 +40,32 @@ cp .env.example .env
 # Rodar servidor
 uvicorn app.main:app --reload
 ```
+
+### Docker (Recomendado)
+
+```bash
+# Desenvolvimento
+make dev
+
+# Produção
+docker compose up -d
+
+# Swarm + Traefik
+./deploy-swarm.sh 1.0.0
+```
+
+## 🐳 Docker
+
+A imagem Docker está disponível em [DockerHub](https://hub.docker.com/r/gabrielramosprof/tjdft-api):
+
+```bash
+docker pull gabrielramosprof/tjdft-api:latest
+
+# Executar
+docker run -p 8000:8000 -e DATABASE_URL="sqlite+aiosqlite:////app/data/tjdft.db" gabrielramosprof/tjdft-api:latest
+```
+
+**Multi-arquitetura:** `linux/amd64`, `linux/arm64`
 
 ## 📡 Endpoints
 
@@ -187,6 +217,58 @@ As migrations funcionam automaticamente com ambos os bancos, usando o driver apr
 | **HTTP Client** | httpx (async) |
 | **Cache** | Redis |
 | **Testes** | pytest |
+| **Database** | SQLite (dev), PostgreSQL (prod) |
+| **Deploy** | Docker Swarm + Traefik |
+
+## 🚀 Deploy
+
+### Docker Swarm + Portainer
+
+1. **Build e push:**
+```bash
+make buildx
+# ou
+./deploy-swarm.sh 1.0.0
+```
+
+2. **No Portainer:**
+   - Stacks → Add Stack
+   - Nome: `tjdft`
+   - Upload `docker-compose.swarm.yml`
+   - **IMPORTANTE:** Altere `api.seu-dominio.com.br` para seu domínio real
+   - Deploy
+
+3. **Traefik vai configurar automaticamente:**
+   - HTTP → HTTPS redirect
+   - SSL automático (LetsEncrypt)
+   - Rate limiting
+   - Health checks
+
+**Deploy manual via CLI:**
+```bash
+docker stack deploy -c docker-compose.swarm.yml tjdft
+```
+
+### Variáveis de Importante
+
+Edite `docker-compose.swarm.yml` antes do deploy:
+
+```yaml
+# DOMÍNIO - ALTERAR ESTE!
+- "traefik.http.routers.tjdft-api-secure.rule=Host(`api.seu-dominio.com.br`)"
+- "traefik.http.routers.tjdft-api.rule=Host(`api.seu-dominio.com.br`)"
+
+# CORS_ORIGINS
+- CORS_ORIGINS=["https://seu-dominio.com.br"]
+```
+
+### Informações Completas de Deploy
+
+Veja [DEPLOYMENT.md](DEPLOYMENT.md) para:
+- Pré-requisitos do cluster
+- Configuração do Traefik
+- Backup e restore
+- Troubleshooting
 
 ## 🤝 Contribuindo
 

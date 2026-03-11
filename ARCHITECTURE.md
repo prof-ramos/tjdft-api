@@ -13,6 +13,8 @@ tjdft-api/
 │   ├── main.py                  # FastAPI application entry point
 │   ├── config.py                # Configuration (pydantic-settings)
 │   ├── database.py              # Database connection & session management
+│   ├── core/                    # Core modules
+│   │   └── sqlite_config.py     # SQLite PRAGMA configuration (WAL, timeouts, etc.)
 │   ├── api/                     # API layer (endpoints)
 │   │   └── v1/
 │   │       └── endpoints/
@@ -221,6 +223,20 @@ tjdft-api/
 
 **Migrations:** Alembic
 
+**SQLite Configuration (Best Practices):**
+The application applies SQLite optimizations automatically via `app/core/sqlite_config.py`:
+
+| PRAGMA | Value | Purpose |
+|--------|-------|---------|
+| `journal_mode` | `WAL` | Write-Ahead Logging for better concurrency |
+| `busy_timeout` | `5000 ms` | Wait time for locked database |
+| `foreign_keys` | `ON` | Enforce foreign key constraints |
+| `mmap_size` | `256 MB` | Memory-mapped I/O for faster reads |
+| `synchronous` | `NORMAL` | Balance safety vs performance |
+| `cache_size` | `-64000` | 64MB negative cache (in-memory) |
+
+These settings are applied via SQLAlchemy event listener on new connections.
+
 ### 4.2. Cache Layer
 
 **Name:** Redis Cache
@@ -274,11 +290,41 @@ tjdft-api/
 
 ## 6. Deployment & Infrastructure
 
+**Deployment Options:**
+- **Development:** Local with `uvicorn app.main:app --reload` or `make dev`
+- **Docker:** Multi-architecture support (linux/amd64, linux/arm64)
+- **Docker Swarm:** With Traefik v2 reverse proxy (recommended for production)
+- **DockerHub:** `gabrielramosprof/tjdft-api:latest`
+
+**Docker Commands:**
+```bash
+# Build for current platform
+make build
+
+# Build multi-arch and push
+make buildx
+
+# Development with hot reload
+make dev
+
+# Production
+docker compose up -d
+```
+
+**Swarm Deployment:**
+```bash
+# Deploy with automatic build and push
+./deploy-swarm.sh 1.0.0
+
+# Or via Portainer UI
+# Upload docker-compose.swarm.yml and deploy
+```
+
 **Cloud Provider:** Configurable (AWS, GCP, Azure, on-premise)
 
 **Recommended Services:**
-- Compute: EC2 / Cloud Run / App Engine
-- Database: PostgreSQL (RDS / Cloud SQL)
+- Compute: Docker Swarm / Kubernetes / EC2 / Cloud Run
+- Database: SQLite (dev), PostgreSQL (prod)
 - Cache: Redis (ElastiCache / Memorystore)
 
 **CI/CD Pipeline:** Configurable (GitHub Actions recommended)
@@ -368,7 +414,7 @@ CORS_ORIGINS=          # Allowed CORS origins (comma-separated)
 
 **Primary Contact/Team:** Gabriel Ramos (@prof-ramos)
 
-**Date of Last Update:** 2025-03-10
+**Date of Last Update:** 2026-03-11
 
 ## 11. Glossary / Acronyms
 
