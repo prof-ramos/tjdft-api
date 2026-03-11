@@ -1,0 +1,86 @@
+# TJDFT API - Avaliação de Prompts
+# Uso: npx promptfoo eval
+
+description: "TJDFT API - Testes de prompts para análise jurídica"
+
+# Prompts a serem testados (variações)
+prompts:
+  - id: resumo-v1
+    raw: |
+      Você é um assistente jurídico especializado.
+      Resuma a seguinte ementa de decisão judicial de forma clara e objetiva:
+      
+      {{ementa}}
+      
+      Responda em JSON com campos: resumo (string), pontos_chave (array de strings)
+
+  - id: resumo-v2-conciso
+    raw: |
+      Resuma esta ementa judicial em no máximo 3 frases.
+      Extraia os 3 pontos mais importantes.
+      
+      {{ementa}}
+      
+      Retorne JSON: {"resumo": "...", "pontos_chave": [...]}
+
+  - id: comparar-v1
+    raw: |
+      Compare as seguintes ementas de decisões judiciais e identifique:
+      1. Similaridades
+      2. Diferenças
+      3. Análise comparativa
+      
+      Decisões:
+      {{decisoes}}
+      
+      Retorne JSON com: similaridades, diferencas, analise
+
+  - id: explicar-v1
+    raw: |
+      Explique o termo jurídico "{{termo}}" de forma didática.
+      {{#contexto}}Contexto adicional: {{contexto}}{{/contexto}}
+      
+      Retorne JSON com: termo, explicacao, exemplos (array), termos_relacionados (array)
+
+# Providers (modelos a testar)
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.3
+      max_tokens: 1000
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.3
+      max_tokens: 1000
+  # Adicione outros providers conforme necessário:
+  # - id: anthropic:claude-3-5-sonnet-20241022
+  # - id: openrouter:anthropic/claude-3.5-sonnet
+
+# Casos de teste
+tests: tests/prompts/datasets/
+
+# Métricas de avaliação
+evaluateOptions:
+  # Tipo de saída esperada
+  - type: is-json
+  
+  # Rubrica LLM para avaliação de qualidade
+  - type: llm-rubric
+    value: |
+      Avalie a resposta em escala 1-5:
+      
+      1. **Formato** (1-5): JSON válido com campos corretos?
+      2. **Precisão** (1-5): Conteúdo juridicamente correto?
+      3. **Clareza** (1-5): Linguagem clara e objetiva?
+      4. **Completude** (1-5): Responde completamente ao solicitado?
+      
+      Retorne apenas um número de 1 a 5 representando a média.
+
+# Configurações de output
+outputPath: tests/prompts/results/
+
+# Rate limiting
+maxConcurrency: 3
+
+# Compartilhar resultados (opcional)
+sharing: false

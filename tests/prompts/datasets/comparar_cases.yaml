@@ -1,0 +1,46 @@
+# Dataset de testes para funcionalidade de comparação
+
+- description: "Comparar - Decisões similares"
+  vars:
+    decisoes: |
+      Decisão 1:
+      APELAÇÃO CÍVEL. DIREITO DO CONSUMIDOR. TELEFONIA.
+      COBRANÇA INDEVIDA. DANO MORAL. 1. A cobrança indevida de
+      serviços não contratados gera dano moral in re ipsa.
+      2. Quantum indenizatório fixado em R$ 3.000,00.
+      
+      Decisão 2:
+      APELAÇÃO CÍVEL. DIREITO DO CONSUMIDOR. TELEFONIA MÓVEL.
+      FATURAS NÃO RECONHECIDAS. DANO MORAL CONFIGURADO.
+      1. O envio de cobrança não reconhecida pelo consumidor
+      constitui falha na prestação de serviços. 2. Indenização
+      por danos morais arbitrada em R$ 4.000,00.
+  assert:
+    - type: is-json
+    - type: contains
+      value: "similaridades"
+    - type: contains
+      value: "diferencas"
+    - type: llm-rubric
+      value: |
+        Deve identificar similaridade: cobrança indevida, telefonema, dano moral.
+        Deve identificar diferença: valores de indenização.
+        Avalie 1-5.
+
+- description: "Comparar - Decisões de áreas diferentes"
+  vars:
+    decisoes: |
+      Decisão 1:
+      ADMINISTRATIVO. SERVIDOR PÚBLICO. GRATIFICAÇÃO.
+      DIREITO ADQUIRIDO. CONCESSÃO MANDAMENTAL.
+      
+      Decisão 2:
+      TRIBUTÁRIO. IPTU. PRESCRIÇÃO INTERCORRENTE.
+      EXECUÇÃO FISCAL. EXTINÇÃO. RECURSO PROVIDO.
+  assert:
+    - type: is-json
+    - type: llm-rubric
+      value: |
+        Deve identificar que são áreas diferentes (administrativo vs tributário).
+        Deve apontar ausência de similaridades relevantes.
+        Avalie 1-5.

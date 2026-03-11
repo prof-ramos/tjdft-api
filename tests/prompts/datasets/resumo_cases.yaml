@@ -1,0 +1,62 @@
+# Dataset de testes para funcionalidade de resumo
+
+- description: "Resumo - Ementa simples"
+  vars:
+    ementa: |
+      APELAÇÃO CÍVEL. DIREITO ADMINISTRATIVO. SERVIDOR PÚBLICO MUNICIPAL.
+      GRATIFICAÇÃO POR ENCARGO DE CURSO E CONCURSO. PREVISÃO EM LEI MUNICIPAL.
+      DIREITO ADQUIRIDO. 1. A gratificação por encargo de curso e concurso
+      está prevista em lei municipal, sendo devida aos servidores que
+      atuarem em cursos de formação e concursos públicos. 2. O direito
+      à percepção da verba torna-se adquirido quando implementadas as
+      condições legais para o seu recebimento. 3. Recurso conhecido e
+      provido. Unânime.
+  assert:
+    - type: is-json
+    - type: contains
+      value: "resumo"
+    - type: contains
+      value: "pontos_chave"
+    - type: javascript
+      value: "output.pontos_chave.length >= 2 && output.pontos_chave.length <= 5"
+
+- description: "Resumo - Ementa complexa"
+  vars:
+    ementa: |
+      CONSTITUCIONAL. ADMINISTRATIVO. CIVIL. AÇÃO CIVIL PÚBLICA.
+      IMPROBIDADE ADMINISTRATIVA. ARTS. 10 E 11 DA LEI 8.429/92.
+      PREFEITO MUNICIPAL. CONTRATAÇÃO DIRETA SEM LICITAÇÃO.
+      DESVIO DE FINALIDADE. DOLO. 1. A contratação direta de serviços
+      sem procedimento licitatório, quando não caracterizada situação
+      de emergência ou urgência, constitui ato de improbidade
+      administrativa. 2. O elemento subjetivo do art. 10 da Lei de
+      Improbidade é o dolo, não exigindo a finalidade específica de
+      enriquecimento ilícito. 3. Configurado desvio de finalidade
+      na contratação de empresa para prestação de serviços de
+      engenharia sem procedimento licitatório. 4. Condenação nas
+      sanções do art. 12, II, da Lei 8.429/92. 5. Recurso de apelação
+      conhecido e não provido._majoridade.
+  assert:
+    - type: is-json
+    - type: llm-rubric
+      value: |
+        O resumo deve mencionar: improbidade, licitação, condenação.
+        Deve ter entre 2 e 5 pontos_chave.
+        Avalie de 1-5.
+
+- description: "Resumo - Penal"
+  vars:
+    ementa: |
+      PENAL. HABEAS CORPUS. TRÁFICO DE DROGAS. ART. 33 DA LEI 11.343/2006.
+      PRISÃO PREVENTIVA. GARANTIA DA ORDEM PÚBLICA. 1. A prisão
+      preventiva pode ser decretada para garantir a ordem pública,
+      quando presentes elementos concretos que demonstrem a necessidade
+      da cautelar. 2. No caso, há elementos suficientes a justificar
+      a medida, considerando a gravidade do delito e a repercussão
+      social. 3. Ordem denegada. Unânime.
+  assert:
+    - type: is-json
+    - type: llm-rubric
+      value: |
+        Resumo deve identificar: tipo penal (tráfico), decisão (ordem denegada).
+        Deve ser objetivo e técnico. Avalie 1-5.
