@@ -190,8 +190,24 @@ As migrations funcionam automaticamente com ambos os bancos, usando o driver apr
 
 ## 🤝 Contribuindo
 
+### Padrão de Nomenclatura de Branches
+
+| Prefixo | Uso | Exemplo |
+|---------|-----|---------|
+| `feature/` | Novas funcionalidades | `feature/add-export-pdf` |
+| `fix/` | Correções de bugs | `fix/async-sqlite-date-validation` |
+| `docs/` | Documentação | `docs/update-readme-api-examples` |
+| `refactor/` | Refatoração de código | `refactor/extract-cache-service` |
+| `test/` | Testes | `test/add-busca-integration-tests` |
+| `chore/` | Manutenção (deps, configs) | `chore/update-dependencies` |
+| `hotfix/` | Correções urgentes em produção | `hotfix/fix-auth-bypass` |
+
+**Convenção:** `{tipo}/{descrição-curta-em-kebab-case}`
+
+### Fluxo de Contribuição
+
 1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-feature`)
+2. Crie uma branch seguindo o padrão (`git checkout -b feature/nova-feature`)
 3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
 4. Push para a branch (`git push origin feature/nova-feature`)
 5. Abra um Pull Request

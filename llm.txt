@@ -269,6 +269,22 @@ pytest -m e2e           # End-to-end (Docker)
 
 ---
 
+## Git Branch Naming Convention
+
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `feature/` | New features | `feature/add-export-pdf` |
+| `fix/` | Bug fixes | `fix/async-sqlite-date-validation` |
+| `docs/` | Documentation | `docs/update-readme-api-examples` |
+| `refactor/` | Code refactoring | `refactor/extract-cache-service` |
+| `test/` | Tests | `test/add-busca-integration-tests` |
+| `chore/` | Maintenance (deps, configs) | `chore/update-dependencies` |
+| `hotfix/` | Urgent production fixes | `hotfix/fix-auth-bypass` |
+
+**Format:** `{type}/{short-description-in-kebab-case}`
+
+---
+
 ## References
 
 - `CLAUDE.md` — Dev setup, structure, commit checklist
