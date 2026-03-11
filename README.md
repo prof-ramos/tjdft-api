@@ -54,6 +54,24 @@ GET /api/v1/busca?q=tributário&pagina=1&tamanho=20
 GET /api/v1/busca/filtros?q=tributário&relator=Nome&classe=Apelação
 ```
 
+## 🧪 Exemplos de Uso com curl
+
+Após iniciar o servidor com `uvicorn app.main:app --reload`:
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Busca simples
+curl "http://localhost:8000/api/v1/busca?q=tributario&pagina=1&tamanho=10"
+
+# Busca com filtros (URL encoded)
+curl "http://localhost:8000/api/v1/busca/filtros?q=tributario&relator=Nome%20do%20Relator&classe=Apelacao"
+
+# Resposta formatada com jq
+curl -s "http://localhost:8000/api/v1/busca?q=tributario&pagina=1&tamanho=5" | jq .
+```
+
 ## 📖 Documentação
 
 - **Swagger UI**: http://localhost:8000/docs
@@ -172,8 +190,24 @@ As migrations funcionam automaticamente com ambos os bancos, usando o driver apr
 
 ## 🤝 Contribuindo
 
+### Padrão de Nomenclatura de Branches
+
+| Prefixo | Uso | Exemplo |
+|---------|-----|---------|
+| `feature/` | Novas funcionalidades | `feature/add-export-pdf` |
+| `fix/` | Correções de bugs | `fix/async-sqlite-date-validation` |
+| `docs/` | Documentação | `docs/update-readme-api-examples` |
+| `refactor/` | Refatoração de código | `refactor/extract-cache-service` |
+| `test/` | Testes | `test/add-busca-integration-tests` |
+| `chore/` | Manutenção (deps, configs) | `chore/update-dependencies` |
+| `hotfix/` | Correções urgentes em produção | `hotfix/fix-auth-bypass` |
+
+**Convenção:** `{tipo}/{descrição-curta-em-kebab-case}`
+
+### Fluxo de Contribuição
+
 1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-feature`)
+2. Crie uma branch seguindo o padrão (`git checkout -b feature/nova-feature`)
 3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
 4. Push para a branch (`git push origin feature/nova-feature`)
 5. Abra um Pull Request
