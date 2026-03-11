@@ -21,8 +21,6 @@ WORKDIR /build
 COPY requirements.txt .
 
 # Install Python dependencies to a temporary location
-# --no-cache-dir: smaller image
-# --upgrade: ensure latest compatible versions (for pip, setuptools, wheel only)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 

@@ -1,7 +1,7 @@
 # TJDFT API Docker Makefile
 # Supports multi-architecture builds for M3 (ARM64) and VPS (AMD64)
 
-.PHONY: help build build-arm64 build-amd64 buildx push test clean dev prod dev-tools down logs logs-api shell db-shell vps-build vps-save vps-load
+.PHONY: help build build-arm64 build-amd64 buildx push test clean dev prod dev-tools down logs logs-api shell db-shell vps-build vps-save vps-load install lint format
 
 # Variables
 IMAGE_NAME = tjdft-api
@@ -13,6 +13,22 @@ help: ## Show this help message
 	@echo "TJDFT API - Docker commands"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+install: ## Instala dependências
+	pip install -r requirements.txt
+	pip install -r requirements-dev.txt
+
+test: ## Roda testes
+	pytest tests/ -v --cov=app --cov-report=html --cov-report=term
+
+lint: ## Checa código
+	black --check app/ tests/
+	ruff check app/ tests/
+	mypy app/
+
+format: ## Formata código
+	black app/ tests/
+	ruff check --fix app/ tests/
 
 build: ## Build image for current platform
 	docker build -t $(IMAGE_NAME):$(VERSION) .
@@ -56,9 +72,6 @@ logs: ## View logs from all services
 
 logs-api: ## View API logs only
 	docker compose logs -f api
-
-test: ## Run tests inside container
-	docker run --rm -v "$(PWD)/tests:/app/tests" -w /app $(IMAGE_NAME):latest pytest
 
 clean: ## Remove all containers, images, and volumes
 	docker compose down -v

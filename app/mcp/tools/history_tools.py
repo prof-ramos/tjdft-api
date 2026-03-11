@@ -14,7 +14,7 @@ from app.mcp.schemas import (
     GetConsultaToolInput,
     ListHistoryToolInput,
 )
-from app.repositories.decisao_repo import DecisaoRepository
+from app.repositories.decisao_repository import DecisaoRepository
 from app.services.busca_service import BuscaService
 
 

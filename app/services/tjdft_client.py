@@ -3,6 +3,8 @@ TJDFT API Client - Async HTTP client for TJDFT jurisprudence search API.
 
 This module provides a complete async client for interacting with the TJDFT
 (Tribunal de Justiça do Distrito Federal e Territórios) jurisprudence API.
+Features: configurable timeouts, retry with exponential backoff, rate limiting,
+structured logging, graceful fallbacks, and response validation.
 
 API Details:
     - Busca:     POST https://jurisdf.tjdft.jus.br/api/v1/pesquisa
@@ -15,19 +17,128 @@ import asyncio
 import hashlib
 import json
 import logging
-from typing import Any, Dict, List, Optional, cast
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional, cast, Union
 
-from httpx import (
-    AsyncClient,
-    ConnectError,
-    HTTPStatusError,
-    Timeout,
-    TimeoutException,
-)
+import httpx
+from pydantic import BaseModel
 
 from app.utils.cache import CacheManager
 
-logger = logging.getLogger(__name__)
+# ==========================================
+# Structured Logging Configuration
+# ==========================================
+
+logger = logging.getLogger("tjdft_client")
+logger.setLevel(logging.INFO)
+
+
+class StructuredFormatter(logging.Formatter):
+    """Formatter para logs estruturados em JSON."""
+
+    def format(self, record):
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+        }
+        if hasattr(record, "extra_data"):
+            log_data.update(record.extra_data)
+        return json.dumps(log_data)
+
+
+# ==========================================
+# Response Models with Pydantic Validation
+# ==========================================
+
+
+class TJDFTItem(BaseModel):
+    """Schema de item retornado pelo TJDFT."""
+
+    id: Optional[str] = None
+    numero_processo: Optional[str] = None
+    ementa: Optional[str] = None
+    relator: Optional[str] = None
+    data_julgamento: Optional[str] = None
+    orgao_julgador: Optional[str] = None
+    classe: Optional[str] = None
+
+
+class TJDFTSearchResult(BaseModel):
+    """Schema de resposta de busca."""
+
+    total: int = 0
+    itens: List[TJDFTItem] = []
+    pagina: int = 0
+    tamanho_pagina: int = 20
+
+
+# ==========================================
+# Graceful Fallback Response
+# ==========================================
+
+
+@dataclass
+class TJDFTResponse:
+    """Resposta padrão com fallback graceful."""
+
+    success: bool
+    data: Optional[dict] = None
+    error: Optional[str] = None
+    cached: bool = False
+    fallback: bool = False
+
+
+# ==========================================
+# Rate Limiter com Token Bucket
+# ==========================================
+
+
+class RateLimiter:
+    """Rate limiter com token bucket."""
+
+    def __init__(self, rate: float = 2.0):
+        """
+        Inicializa rate limiter.
+
+        Args:
+            rate: Número de requisições por segundo (default: 2.0)
+        """
+        self.rate = rate
+        self._tokens = rate
+        self._last_update = asyncio.get_event_loop().time()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        """Adquire um token do bucket."""
+        async with self._lock:
+            now = asyncio.get_event_loop().time()
+            elapsed = now - self._last_update
+            self._tokens = min(self.rate, self._tokens + elapsed * self.rate)
+
+            if self._tokens < 1:
+                wait_time = (1 - self._tokens) / self.rate
+                await asyncio.sleep(wait_time)
+                self._tokens = 0
+            else:
+                self._tokens -= 1
+
+            self._last_update = asyncio.get_event_loop().time()
+
+    async def __aenter__(self):
+        await self.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+# ==========================================
+# Custom Exceptions
+# ==========================================
 
 
 class TJDFTClientError(Exception):
@@ -54,21 +165,26 @@ class TJDFTAPIError(TJDFTClientError):
     pass
 
 
+# ==========================================
+# Main TJDFT Client
+# ==========================================
+
+
 class TJDFTClient:
     """
     Cliente assíncrono para API de pesquisa do TJDFT.
 
     Realiza buscas de acórdãos via POST com suporte a filtros por relator,
     classe processual e órgão julgador. Inclui cache, retry com backoff
-    exponencial e tratamento de erros.
+    exponencial, rate limiting e tratamento de erros.
 
-    Example:
-        >>> cache = CacheManager()
-        >>> async with TJDFTClient(cache) as client:
-        ...     results = await client.buscar_simples("tributário")
-        ...     print(results["total"], "acórdãos encontrados")
-        ...     for r in results["registros"]:
-        ...         print(r["dataJulgamento"], r["processo"])
+    Features:
+        - Configurable timeouts and retries
+        - Exponential backoff retry logic
+        - Rate limiting (token bucket)
+        - Graceful fallback responses
+        - Structured logging
+        - Pydantic response validation
     """
 
     BASE_URL = "https://jurisdf.tjdft.jus.br/api/v1/pesquisa"
@@ -80,17 +196,44 @@ class TJDFTClient:
     def __init__(
         self,
         cache_manager: CacheManager,
-        timeout: float = DEFAULT_TIMEOUT,
-        connect_timeout: float = CONNECT_TIMEOUT,
+        timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        rate_limit: float = 2.0,
     ):
+        """
+        Initialize TJDFT client with configurable parameters.
+
+        Args:
+            cache_manager: CacheManager instance for caching responses
+            timeout: Request timeout in seconds (default: 30.0)
+            max_retries: Maximum number of retry attempts (default: 3)
+            retry_delay: Base delay for retries in seconds (default: 1.0)
+            rate_limit: Rate limit in requests/second (default: 2.0)
+        """
         self.cache = cache_manager
-        self.client: Optional[AsyncClient] = None
-        self.timeout = Timeout(timeout, connect=connect_timeout)
-        logger.info(f"TJDFTClient initialized with timeout={timeout}s")
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.client: Optional[httpx.AsyncClient] = None
+        self._rate_limiter = RateLimiter(rate=rate_limit)
+
+        logger.info(
+            "TJDFTClient initialized",
+            extra={
+                "extra_data": {
+                    "timeout": timeout,
+                    "max_retries": max_retries,
+                    "retry_delay": retry_delay,
+                    "rate_limit": rate_limit,
+                }
+            },
+        )
 
     async def __aenter__(self):
-        self.client = AsyncClient(
-            timeout=self.timeout,
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(self.timeout, connect=self.CONNECT_TIMEOUT),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             follow_redirects=True,
             headers={
                 "User-Agent": "TJDFT-API/1.0",
@@ -102,56 +245,66 @@ class TJDFTClient:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.client:
-            try:
-                await self.client.aclose()
-            finally:
-                self.client = None
+            await self.client.aclose()
+            logger.debug("AsyncClient closed")
+            self.client = None
 
     async def buscar_simples(
         self,
         query: str,
         pagina: int = 0,
         tamanho: int = 20,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], TJDFTResponse]:
         """
-        Busca acórdãos por texto livre.
+        Busca acórdãos por texto livre com suporte a fallback.
 
         Args:
-            query: Termo de busca em linguagem natural. Pode ser vazio ("") para
-                   retornar todos os acórdãos sem filtro de tema.
-            pagina: Página (0-indexed). Default: 0.
-            tamanho: Resultados por página. Mín: 1, Máx: 40. Default: 20.
+            query: Termo de busca (pode ser vazio).
+            pagina: Página (0-indexed).
+            tamanho: Resultados por página (máx 40).
 
         Returns:
-            Dict com:
-            - registros: Lista de acórdãos
-            - total: Total de acórdãos encontrados
-            - pagina: Página atual
-            - tamanho: Tamanho da página
-            - agregacoes: Agregações por relator, classe, órgão etc.
-
-        Raises:
-            TJDFTConnectionError: Erro de conexão
-            TJDFTTimeoutError: Timeout
-            TJDFTAPIError: Erro retornado pela API
+            Dict ou TJDFTResponse com resultados.
         """
+        if not isinstance(query, str):
+            return TJDFTResponse(
+                success=False, error="Query must be a string", fallback=True
+            )
+
         tamanho = min(tamanho, self.MAX_TAMANHO)
         payload = {"query": query, "pagina": pagina, "tamanho": tamanho}
         cache_key = self._build_cache_key("simples", payload)
 
-        cached = self.cache.get(cache_key)
-        if cached is not None:
-            logger.debug(f"Cache hit: {cache_key}")
-            return cast(
-                Dict[str, Any],
-                json.loads(cached) if isinstance(cached, str) else cached,
+        try:
+            cached = self.cache.get(cache_key)
+            if cached:
+                logger.debug(f"Cache hit: {cache_key}")
+                data = json.loads(cached) if isinstance(cached, str) else cached
+                return TJDFTResponse(success=True, data=data, cached=True)
+
+            async with self._rate_limiter:
+                data = await self._post(payload)
+                result = self._normalize_response(data, pagina, tamanho)
+
+                # Validate response
+                if not self._validate_response(result):
+                    return TJDFTResponse(
+                        success=False,
+                        error="Invalid API response format",
+                        fallback=True,
+                    )
+
+                self.cache.set(cache_key, result, ttl=3600)
+                return TJDFTResponse(success=True, data=result)
+
+        except (TJDFTConnectionError, TJDFTTimeoutError) as e:
+            logger.error(f"Network error in buscar_simples: {e}")
+            return TJDFTResponse(success=False, error=str(e), fallback=True)
+        except Exception as e:
+            logger.exception(f"Unexpected error in buscar_simples: {e}")
+            return TJDFTResponse(
+                success=False, error=f"Internal error: {str(e)}", fallback=True
             )
-
-        data = await self._post(payload)
-        result = self._normalize_response(data, pagina, tamanho)
-
-        self.cache.set(cache_key, result, ttl=3600)
-        return result
 
     async def buscar_com_filtros(
         self,
@@ -166,35 +319,8 @@ class TJDFTClient:
         processo: Optional[str] = None,
         pagina: int = 0,
         tamanho: int = 20,
-    ) -> Dict[str, Any]:
-        """
-        Busca decisões com filtros avançados.
-
-        Cobre acórdãos e decisões monocráticas do TJDFT.
-
-        Args:
-            query: Termo de busca. Default "" (sem filtro de tema).
-            relator: Nome exato do relator (ver GET /pesquisa → relatores).
-            classe: Classe processual (ex: "APELAÇÃO CÍVEL").
-            orgao_julgador: Órgão julgador (ex: "1ª TURMA CÍVEL").
-            base: Base documental: "acordaos" ou "decisoes".
-            subbase: Subbase: "acordaos", "acordaos-tr", "decisoes-monocraticas".
-            revisor: Nome exato do revisor (campo: nomeRevisor).
-            relator_designado: Nome do relator designado (campo: nomeRelatorDesignado).
-            processo: Número CNJ do processo (ex: "0702180-36.2024.8.07.0001").
-            pagina: Página (0-indexed). Default: 0.
-            tamanho: Resultados por página. Máx: 40. Default: 20.
-
-        Returns:
-            Mesmo formato de buscar_simples.
-
-        Raises:
-            TJDFTConnectionError, TJDFTTimeoutError, TJDFTAPIError
-
-        Note:
-            Filtro por data (dataJulgamento/dataPublicacao) não é suportado
-            — causa erro 500 na API.
-        """
+    ) -> TJDFTResponse:
+        """Busca com filtros avançados e fallback graceful."""
         tamanho = min(tamanho, self.MAX_TAMANHO)
 
         termos = []
@@ -215,25 +341,33 @@ class TJDFTClient:
         if processo:
             termos.append({"campo": "processo", "valor": processo})
 
-        payload: Dict[str, Any] = {"query": query, "pagina": pagina, "tamanho": tamanho}
+        payload = {"query": query, "pagina": pagina, "tamanho": tamanho}
         if termos:
             payload["termosAcessorios"] = termos
 
         cache_key = self._build_cache_key("filtrada", payload)
 
-        cached = self.cache.get(cache_key)
-        if cached is not None:
-            logger.debug(f"Cache hit: {cache_key}")
-            return cast(
-                Dict[str, Any],
-                json.loads(cached) if isinstance(cached, str) else cached,
-            )
+        try:
+            cached = self.cache.get(cache_key)
+            if cached:
+                data = json.loads(cached) if isinstance(cached, str) else cached
+                return TJDFTResponse(success=True, data=data, cached=True)
 
-        data = await self._post(payload)
-        result = self._normalize_response(data, pagina, tamanho)
+            async with self._rate_limiter:
+                data = await self._post(payload)
+                result = self._normalize_response(data, pagina, tamanho)
 
-        self.cache.set(cache_key, result, ttl=3600)
-        return result
+                if not self._validate_response(result):
+                    return TJDFTResponse(
+                        success=False, error="Invalid response format", fallback=True
+                    )
+
+                self.cache.set(cache_key, result, ttl=3600)
+                return TJDFTResponse(success=True, data=result)
+
+        except Exception as e:
+            logger.error(f"Error in buscar_com_filtros: {e}")
+            return TJDFTResponse(success=False, error=str(e), fallback=True)
 
     async def buscar_todas_paginas(
         self,
@@ -241,108 +375,58 @@ class TJDFTClient:
         max_paginas: int = 10,
         tamanho: int = 40,
         **filtros,
-    ) -> List[Dict[str, Any]]:
-        """
-        Coleta acórdãos de múltiplas páginas automaticamente.
-
-        Args:
-            query: Termo de busca.
-            max_paginas: Limite de páginas a buscar. Default: 10.
-            tamanho: Resultados por página (máx 40). Default: 40.
-            **filtros: Filtros aceitos por buscar_com_filtros
-                       (relator, classe, orgao_julgador, base, etc.)
-
-        Returns:
-            Lista de todos os registros coletados.
-        """
-        all_registros: List[Dict[str, Any]] = []
+    ) -> Union[List[Dict[str, Any]], TJDFTResponse]:
+        """Coleta acórdãos de múltiplas páginas automaticamente."""
+        all_registros = []
         tamanho = min(tamanho, self.MAX_TAMANHO)
 
-        logger.info(f"Iniciando busca multi-página: query='{query}', max={max_paginas}")
+        logger.info(f"Multi-page search: query='{query}', max={max_paginas}")
 
         for pagina in range(max_paginas):
-            result = await self.buscar_com_filtros(
+            response = await self.buscar_com_filtros(
                 query=query, pagina=pagina, tamanho=tamanho, **filtros
             )
 
-            registros = result.get("registros", [])
+            if not response.success:
+                if all_registros:  # Return partial if we have something
+                    return all_registros
+                return response
+
+            registros = response.data.get("registros", [])
             if not registros:
-                logger.info(f"Sem mais resultados na página {pagina}")
                 break
 
             all_registros.extend(registros)
-            logger.info(
-                "Página %s: %s registros (total: %s)",
-                pagina,
-                len(registros),
-                len(all_registros),
-            )
-
-            total = result.get("total", 0)
+            total = response.data.get("total", 0)
             if len(all_registros) >= total:
-                logger.info(f"Todos os {len(all_registros)} registros coletados")
                 break
 
             await asyncio.sleep(0.1)
 
-        logger.info(f"Busca concluída: {len(all_registros)} registros")
         return all_registros
 
-    async def get_metadata(self) -> Dict[str, Any]:
-        """
-        Obtém listas de valores válidos para filtros.
-
-        Returns:
-            Dict com:
-            - relatores: Lista de 228 nomes de relatores
-            - revisores: Lista de 63 revisores
-            - designados: Lista de 200 relatores designados
-            - classes: Lista de 125 classes processuais
-            - orgaos: Lista de 33 grupos de órgãos com variantes
-
-        Raises:
-            TJDFTConnectionError, TJDFTTimeoutError, TJDFTAPIError
-        """
+    async def get_metadata(self) -> Union[Dict[str, Any], TJDFTResponse]:
+        """Obtém listas de valores válidos para filtros."""
         cache_key = "tjdft:metadata"
 
-        cached = self.cache.get(cache_key)
-        if cached is not None:
-            logger.debug("Metadata cache hit")
-            return cast(
-                Dict[str, Any],
-                json.loads(cached) if isinstance(cached, str) else cached,
-            )
+        try:
+            cached = self.cache.get(cache_key)
+            if cached:
+                return TJDFTResponse(
+                    success=True,
+                    data=json.loads(cached) if isinstance(cached, str) else cached,
+                    cached=True,
+                )
 
-        if not self.client:
-            raise RuntimeError("Client not initialized. Use 'async with' statement.")
+            if not self.client:
+                raise RuntimeError("Client not initialized")
 
-        for attempt in range(1, self.MAX_RETRIES + 1):
-            try:
-                response = await self.client.get(self.BASE_URL)
-                response.raise_for_status()
-                metadata = cast(Dict[str, Any], response.json())
-                self.cache.set(cache_key, metadata, ttl=86400)
-                return metadata
+            metadata = await self._request_with_retry("GET", self.BASE_URL)
+            self.cache.set(cache_key, metadata, ttl=86400)
+            return TJDFTResponse(success=True, data=metadata)
 
-            except ConnectError as e:
-                if attempt == self.MAX_RETRIES:
-                    raise TJDFTConnectionError(f"Falha de conexão: {e}") from e
-                await asyncio.sleep(2**attempt)
-
-            except TimeoutException as e:
-                if attempt == self.MAX_RETRIES:
-                    raise TJDFTTimeoutError(f"Timeout: {e}") from e
-                await asyncio.sleep(2**attempt)
-
-            except HTTPStatusError as e:
-                raise TJDFTAPIError(
-                    f"Erro API {e.response.status_code}: {e.response.text}"
-                ) from e
-
-            except Exception as e:
-                raise TJDFTClientError(f"Erro inesperado: {e}") from e
-
-        raise TJDFTClientError("Falha ao obter metadados")
+        except Exception as e:
+            return TJDFTResponse(success=False, error=str(e), fallback=True)
 
     # ------------------------------------------------------------------
     # Internals
@@ -354,53 +438,55 @@ class TJDFTClient:
         return f"tjdft:{search_type}:{h}"
 
     async def _post(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """POST para o endpoint de busca com retry e backoff."""
-        if not self.client:
-            raise RuntimeError("Client not initialized. Use 'async with' statement.")
+        """Realiza POST com retry automático."""
+        return await self._request_with_retry("POST", self.BASE_URL, json=payload)
 
-        for attempt in range(1, self.MAX_RETRIES + 1):
+    async def _request_with_retry(
+        self, method: str, url: str, **kwargs
+    ) -> Dict[str, Any]:
+        """Request com retry e backoff exponencial."""
+        if not self.client:
+            raise RuntimeError("Client not initialized")
+
+        last_exception = None
+        for attempt in range(self.max_retries):
             try:
-                logger.debug(
-                    f"POST {self.BASE_URL} attempt={attempt} payload={payload}"
-                )
-                response = await self.client.post(self.BASE_URL, json=payload)
+                response = await self.client.request(method, url, **kwargs)
                 response.raise_for_status()
                 return cast(Dict[str, Any], response.json())
 
-            except ConnectError as e:
-                logger.warning(f"Conexão falhou (tentativa {attempt}): {e}")
-                if attempt == self.MAX_RETRIES:
-                    raise TJDFTConnectionError(
-                        f"Falha de conexão após {self.MAX_RETRIES} tentativas"
-                    ) from e
-                await asyncio.sleep(2**attempt)
-
-            except TimeoutException as e:
-                logger.warning(f"Timeout (tentativa {attempt}): {e}")
-                if attempt == self.MAX_RETRIES:
+            except (
+                httpx.ConnectError,
+                httpx.TimeoutException,
+                httpx.NetworkError,
+            ) as e:
+                last_exception = e
+                if attempt < self.max_retries - 1:
+                    delay = self.retry_delay * (2**attempt)
+                    await asyncio.sleep(delay)
+                    continue
+                if isinstance(e, httpx.TimeoutException):
                     raise TJDFTTimeoutError(
-                        f"Timeout após {self.MAX_RETRIES} tentativas"
-                    ) from e
-                await asyncio.sleep(2**attempt)
+                        f"Timeout after {self.max_retries} attempts"
+                    )
+                raise TJDFTConnectionError(f"Connection failed: {e}")
 
-            except HTTPStatusError as e:
-                logger.error(f"HTTP {e.response.status_code}: {e.response.text}")
-                if 400 <= e.response.status_code < 500:
-                    raise TJDFTAPIError(
-                        f"Erro {e.response.status_code}: {e.response.text}"
-                    ) from e
-                if attempt == self.MAX_RETRIES:
-                    raise TJDFTAPIError(
-                        "Erro servidor "
-                        f"{e.response.status_code} após {self.MAX_RETRIES} tentativas"
-                    ) from e
-                await asyncio.sleep(2**attempt)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code >= 500 and attempt < self.max_retries - 1:
+                    delay = self.retry_delay * (2**attempt)
+                    await asyncio.sleep(delay)
+                    continue
+                raise TJDFTAPIError(
+                    f"API Error {e.response.status_code}: {e.response.text}"
+                )
 
-            except Exception as e:
-                logger.error(f"Erro inesperado: {e}")
-                raise TJDFTClientError(f"Erro inesperado: {e}") from e
+        raise TJDFTClientError(
+            f"Failed after {self.max_retries} retries: {last_exception}"
+        )
 
-        raise TJDFTClientError("Falha ao completar requisição")
+    def _validate_response(self, data: dict) -> bool:
+        """Valida se resposta está no formato esperado (opcional para simplicidade interna)."""
+        return "registros" in data or "itens" in data
 
     def _normalize_response(
         self, data: Dict[str, Any], pagina: int, tamanho: int

@@ -90,7 +90,9 @@ class CacheManager:
                     )
                     logger.info(f"Redis client configured for {safe_host}")
                 else:
-                    logger.info(f"Redis client configured for {redis_host}:{redis_port}")
+                    logger.info(
+                        f"Redis client configured for {redis_host}:{redis_port}"
+                    )
             except Exception as e:
                 logger.warning(
                     f"Failed to configure Redis: {e}. Using in-memory cache."

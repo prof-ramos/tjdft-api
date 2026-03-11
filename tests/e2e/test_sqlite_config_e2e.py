@@ -119,7 +119,9 @@ async def test_sqlite_mmap_size_configured(sqlite_engine: AsyncEngine):
         mmap_size = result.scalar_one()
 
     # Assert - Should be 256MB
-    assert mmap_size == MMAP_SIZE_BYTES, f"Expected {MMAP_SIZE_BYTES} but got {mmap_size}"
+    assert (
+        mmap_size == MMAP_SIZE_BYTES
+    ), f"Expected {MMAP_SIZE_BYTES} but got {mmap_size}"
 
 
 @pytest.mark.e2e
@@ -133,7 +135,9 @@ async def test_sqlite_cache_size_configured(sqlite_engine: AsyncEngine):
         cache_size = result.scalar_one()
 
     # Assert - Should be -64000 (64MB)
-    assert cache_size == CACHE_SIZE_PAGES, f"Expected {CACHE_SIZE_PAGES} but got {cache_size}"
+    assert (
+        cache_size == CACHE_SIZE_PAGES
+    ), f"Expected {CACHE_SIZE_PAGES} but got {cache_size}"
 
 
 @pytest.mark.e2e
@@ -153,6 +157,7 @@ async def test_sqlite_synchronous_mode_set(sqlite_engine: AsyncEngine):
 @pytest.mark.asyncio
 async def test_configure_sqlite_function():
     """Test the configure_sqlite function directly."""
+
     # Arrange - Create a mock connection object
     class MockDialect:
         name = "sqlite"
@@ -185,7 +190,9 @@ async def test_configure_sqlite_function():
 
     # Assert - Verify all pragmas were set
     assert "journal_mode" in mock_conn.connection.pragmas
-    assert mock_conn.connection.pragmas["journal_mode"] == "WAL"  # SQLite returns uppercase
+    assert (
+        mock_conn.connection.pragmas["journal_mode"] == "WAL"
+    )  # SQLite returns uppercase
     assert mock_conn.connection.pragmas["busy_timeout"] == str(BUSY_TIMEOUT_MS)
     assert mock_conn.connection.pragmas["foreign_keys"] == "ON"
     assert mock_conn.connection.pragmas["mmap_size"] == str(MMAP_SIZE_BYTES)
@@ -197,6 +204,7 @@ async def test_configure_sqlite_function():
 @pytest.mark.asyncio
 async def test_configure_sqlite_skips_non_sqlite():
     """Test that configure_sqlite skips non-SQLite databases."""
+
     # Arrange - Create a mock connection with PostgreSQL dialect
     class PostgresDialect:
         name = "postgresql"
@@ -215,7 +223,9 @@ async def test_configure_sqlite_skips_non_sqlite():
     configure_sqlite(mock_conn)
 
     # Assert - execute should not be called for PostgreSQL
-    assert not mock_conn.execute_called, "configure_sqlite should skip non-SQLite databases"
+    assert (
+        not mock_conn.execute_called
+    ), "configure_sqlite should skip non-SQLite databases"
 
 
 @pytest.mark.e2e

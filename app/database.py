@@ -21,6 +21,7 @@ engine = create_async_engine(
 @event.listens_for(engine.sync_engine, "connect")
 def on_connect(dbapi_conn, connection_record):
     """Apply SQLite configuration pragmas on new connections."""
+
     # Create a minimal connection wrapper for the configure function
     class _SimpleConnection:
         def __init__(self, dialect, connection):
@@ -29,6 +30,7 @@ def on_connect(dbapi_conn, connection_record):
 
     wrapper = _SimpleConnection(engine.dialect, dbapi_conn)
     configure_sqlite(wrapper)
+
 
 # Create async session factory
 async_session_maker = async_sessionmaker(

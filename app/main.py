@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints.busca import router as busca_router
+from app.api.v1 import router as api_v1_router
 from app.config import get_settings
 
 settings = get_settings()
@@ -25,8 +25,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(busca_router, prefix="/api/v1")
+# Incluir routers da API
+app.include_router(api_v1_router, prefix="/api")
 
 
 @app.get("/", tags=["Root"])
@@ -34,7 +34,7 @@ async def root():
     """API root endpoint"""
     return {
         "message": "TJDFT API",
-        "version": "0.1.0",
+        "version": settings.app_version,
         "docs": "/docs",
         "redoc": "/redoc",
     }

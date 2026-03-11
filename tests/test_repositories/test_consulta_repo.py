@@ -4,7 +4,7 @@ from datetime import date, datetime
 import pytest
 
 from app.models.consulta import Consulta
-from app.repositories.consulta_repo import ConsultaRepository
+from app.repositories.consulta_repository import ConsultaRepository
 
 pytestmark = pytest.mark.integration
 
