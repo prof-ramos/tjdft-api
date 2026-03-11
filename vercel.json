@@ -1,8 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.py"
+    }
+  ],
   "functions": {
-    "app/**/*.py": {
-      "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,docs/**,data/**,.git/**,.venv/**,venv/**,.pytest_cache/**,.mypy_cache/**,**/__pycache__/**,**/*.pyc}"
+    "api/index.py": {
+      "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,docs/**,.git/**,.venv/**,venv/**,.pytest_cache/**,.mypy_cache/**,**/__pycache__/**,**/*.pyc}"
     }
   }
 }
