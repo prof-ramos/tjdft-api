@@ -8,7 +8,7 @@ This module provides validation functions for reference data including relatores
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, cast, List, Optional, cast
+from typing import Any, Dict, List, cast
 
 from app.utils.cache import get_cache
 
@@ -58,7 +58,7 @@ def load_referencia() -> Dict[str, Any]:
             raise FileNotFoundError(f"Reference file not found: {referencia_path}")
 
         with open(referencia_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            data = cast(Dict[str, Any], json.load(f))
 
         # Cache for 24 hours
         cache.set(cache_key, data, ttl=REFERENCIA_TTL)

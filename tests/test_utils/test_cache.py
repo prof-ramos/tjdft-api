@@ -1,3 +1,4 @@
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -247,6 +248,20 @@ class TestCacheManagerLRU:
         assert cache.exists("key2") is False  # Evicted (oldest)
         assert cache.exists("key3") is True
         assert cache.exists("key4") is True
+
+    def test_exists_removes_expired_entry_from_memory_cache(self):
+        """Test that exists() honors TTL expiration in memory backend."""
+        cache = CacheManager()
+        cache._redis_client = None
+
+        cache.set("key1", {"value": 1}, ttl=1)
+
+        assert cache.exists("key1") is True
+
+        time.sleep(1.1)
+
+        assert cache.exists("key1") is False
+        assert cache.get("key1") is None
 
     def test_lru_recency_update_on_set_existing_key(self):
         """Test that updating existing key updates its recency."""
