@@ -65,7 +65,11 @@ class BuscaResponseEnriquecida(BaseModel):
     resultados: List[DecisaoEnriquecida] = Field(
         ..., description="List of enriched decisions"
     )
+    total: int = Field(..., description="Total results found (before filtering)")
     total_filtrado: int = Field(..., description="Total results after filtering")
+    pagina: int = Field(..., description="Current page number")
+    tamanho: int = Field(..., description="Results per page")
+    consulta_id: str = Field(..., description="Consulta UUID for tracking")
     densidade: Optional[Dict[str, Any]] = Field(
         None, description="Density metrics by category"
     )

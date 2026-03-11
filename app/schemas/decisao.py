@@ -6,11 +6,32 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
+def _parse_date(value: Any) -> Optional[date]:
+    """Parse date from string or date object."""
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        # Try ISO format datetime string (e.g., "2026-02-19T03:00:00.000Z")
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.date()
+        except ValueError:
+            pass
+        # Try date string (e.g., "2026-02-19")
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    return None
+
+
 class DecisaoBase(BaseModel):
     """Base schema for decisao with common fields."""
 
-    uuid_tjdft: str = Field(
-        ..., alias="uuid", description="TJDFT UUID for the decision"
+    uuid_tjdft: Optional[str] = Field(
+        None, alias="uuid", description="TJDFT UUID for the decision"
     )
     processo: Optional[str] = Field(
         None, alias="numeroProcesso", description="Process number"
@@ -35,25 +56,11 @@ class DecisaoBase(BaseModel):
         None, alias="descricaoClasseCnj", description="Process class/type"
     )
 
-    @field_validator('data_julgamento', 'data_publicacao', mode='before')
+    @field_validator("data_julgamento", "data_publicacao", mode="before")
     @classmethod
-    def parse_datetime_to_date(cls, v: Any) -> Any:
-        """
-        Convert datetime/date objects or strings to ISO date string.
-        
-        Handles:
-        - datetime.datetime -> v.date().isoformat()
-        - datetime.date -> v.isoformat()
-        - str with 'T' (datetime string) -> date part only
-        - other values -> return as-is
-        """
-        if isinstance(v, datetime):
-            return v.date().isoformat()
-        if isinstance(v, date):
-            return v.isoformat()
-        if isinstance(v, str) and 'T' in v:
-            return v.split('T')[0]
-        return v
+    def parse_dates(cls, value: Any) -> Optional[date]:
+        """Parse date from string or date object."""
+        return _parse_date(value)
 
     model_config = {"from_attributes": True, "populate_by_name": True}
 
