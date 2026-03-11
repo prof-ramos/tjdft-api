@@ -17,13 +17,12 @@ import asyncio
 import hashlib
 import json
 import logging
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, cast, Union
 
 import httpx
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from app.utils.cache import CacheManager
 
@@ -307,14 +306,22 @@ class TJDFTClient:
         tamanho = min(tamanho, self.MAX_TAMANHO)
 
         termos = []
-        if relator: termos.append({"campo": "nomeRelator", "valor": relator})
-        if classe: termos.append({"campo": "descricaoClasseCnj", "valor": classe})
-        if orgao_julgador: termos.append({"campo": "descricaoOrgaoJulgador", "valor": orgao_julgador})
-        if base: termos.append({"campo": "base", "valor": base})
-        if subbase: termos.append({"campo": "subbase", "valor": subbase})
-        if revisor: termos.append({"campo": "nomeRevisor", "valor": revisor})
-        if relator_designado: termos.append({"campo": "nomeRelatorDesignado", "valor": relator_designado})
-        if processo: termos.append({"campo": "processo", "valor": processo})
+        if relator:
+            termos.append({"campo": "nomeRelator", "valor": relator})
+        if classe:
+            termos.append({"campo": "descricaoClasseCnj", "valor": classe})
+        if orgao_julgador:
+            termos.append({"campo": "descricaoOrgaoJulgador", "valor": orgao_julgador})
+        if base:
+            termos.append({"campo": "base", "valor": base})
+        if subbase:
+            termos.append({"campo": "subbase", "valor": subbase})
+        if revisor:
+            termos.append({"campo": "nomeRevisor", "valor": revisor})
+        if relator_designado:
+            termos.append({"campo": "nomeRelatorDesignado", "valor": relator_designado})
+        if processo:
+            termos.append({"campo": "processo", "valor": processo})
 
         payload = {"query": query, "pagina": pagina, "tamanho": tamanho}
         if termos:

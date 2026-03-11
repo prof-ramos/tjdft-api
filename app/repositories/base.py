@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, Optional, List, Any
+from typing import Generic, TypeVar, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 

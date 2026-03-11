@@ -1,11 +1,9 @@
 """Repository for Decisao model operations."""
 
-import uuid
 from datetime import date
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 from sqlalchemy import and_, func, select, desc
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.decisao import Decisao

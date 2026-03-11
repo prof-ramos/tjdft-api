@@ -2,10 +2,9 @@
 
 import uuid
 from datetime import date, datetime, time, timedelta
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, delete, func, select, desc
-from sqlalchemy.engine import CursorResult
+from sqlalchemy import and_, func, select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consulta import Consulta

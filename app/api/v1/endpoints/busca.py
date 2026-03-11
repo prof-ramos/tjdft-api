@@ -2,14 +2,13 @@
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.schemas.consulta import BuscaRequest, BuscaResponseEnriquecida, ConsultaResponse
 from app.services.busca_service import BuscaService
 from app.utils.cache import get_cache
-from app.repositories.consulta_repository import ConsultaRepository
 
 router = APIRouter(prefix="/busca", tags=["Busca"])
 
@@ -79,11 +78,16 @@ async def busca_com_filtros(
 ) -> Dict[str, Any]:
     """Busca avançada com filtros via GET"""
     filtros = {}
-    if relator: filtros["relator"] = relator
-    if classe: filtros["classe"] = classe
-    if orgao: filtros["orgao_julgador"] = orgao
-    if data_inicio: filtros["data_inicio"] = data_inicio
-    if data_fim: filtros["data_fim"] = data_fim
+    if relator:
+        filtros["relator"] = relator
+    if classe:
+        filtros["classe"] = classe
+    if orgao:
+        filtros["orgao_julgador"] = orgao
+    if data_inicio:
+        filtros["data_inicio"] = data_inicio
+    if data_fim:
+        filtros["data_fim"] = data_fim
 
     request = BuscaRequest(query=q, filtros=filtros, pagina=pagina, tamanho=limite)
     cache = get_cache()
