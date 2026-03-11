@@ -1,0 +1,59 @@
+# Dataset de testes para funcionalidade de explicação
+
+- description: "Explicar - Termo comum"
+  vars:
+    termo: "coisa julgada"
+    contexto: ""
+  assert:
+    - type: is-json
+    - type: contains
+      value: "explicacao"
+    - type: contains
+      value: "exemplos"
+    - type: javascript
+      value: "output.exemplos.length >= 1"
+    - type: llm-rubric
+      value: |
+        Explicação deve ser didática, correta juridicamente.
+        Deve ter pelo menos 1 exemplo prático.
+        Avalie 1-5.
+
+- description: "Explicar - Termo com contexto"
+  vars:
+    termo: "súmula vinculante"
+    contexto: "Processo de improbidade administrativa"
+  assert:
+    - type: is-json
+    - type: llm-rubric
+      value: |
+        Explicação deve mencionar o contexto de improbidade.
+        Deve explicar o efeito vinculante.
+        Avalie 1-5.
+
+- description: "Explicar - Termo técnico"
+  vars:
+    termo: "tutela antecipada antecedente"
+    contexto: ""
+  assert:
+    - type: is-json
+    - type: llm-rubric
+      value: |
+        Deve explicar a diferença de tutela antecipada comum.
+        Deve mencionar requisitos do CPC.
+        Deve ter exemplos práticos.
+        Avalie 1-5.
+
+- description: "Explicar - Latim"
+  vars:
+    termo: "habeas corpus"
+    contexto: ""
+  assert:
+    - type: is-json
+    - type: contains
+      value: "termos_relacionados"
+    - type: llm-rubric
+      value: |
+        Deve explicar origem latina.
+        Deve explicar função constitucional.
+        Deve citar termos relacionados (mandado de segurança, habeas data).
+        Avalie 1-5.

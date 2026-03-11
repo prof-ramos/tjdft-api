@@ -1,0 +1,6 @@
+# Resultados de avaliação (não commitar)
+results/
+*.json
+
+# Cache do promptfoo
+.promptfoo/
