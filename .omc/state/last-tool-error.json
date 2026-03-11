@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"source venv/bin/activate && python -m mypy app/services/tjdft_client.py --ignore-missing-imports\",\"description\":\"Check types with mypy\"}",
-  "error": "Exit code 2\npyproject.toml:1: error: Error importing plugin \"pydantic.mypy\": No module named 'pydantic'  [misc]\nFound 1 error in 1 file (errors prevented further checking)\n\npyproject.toml:1: error: Error importing plugin \"pydantic.mypy\": No module named 'pydantic'  [misc]\nFound 1 error in 1 file (errors prevented further checking)",
-  "timestamp": "2026-03-03T19:47:54.715Z",
-  "retry_count": 9
-}

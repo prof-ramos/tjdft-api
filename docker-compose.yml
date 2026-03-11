@@ -1,0 +1,79 @@
+# Production Docker Compose for TJDFT API
+# Optimized for VPS deployment (Ubuntu/Debian)
+
+services:
+  # Main API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tjdft-api:latest
+    container_name: tjdft-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/tjdft.db
+      - REDIS_URL=redis://redis:6379
+      - CACHE_TTL=3600
+      - DEBUG=false
+      # CORS_ORIGINS deve ser definida via .env ou antes do deploy
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:8000"]
+    volumes:
+      # Persist SQLite database
+      - tjdft-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - tjdft-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis for caching (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: tjdft-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - tjdft-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - redis-data:/data
+
+  # Nginx reverse proxy (optional, for production)
+  nginx:
+    image: nginx:alpine
+    container_name: tjdft-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - tjdft-network
+    profiles:
+      - with-nginx
+
+volumes:
+  tjdft-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  tjdft-network:
+    driver: bridge

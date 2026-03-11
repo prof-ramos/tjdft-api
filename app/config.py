@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from typing import Optional
 
@@ -17,7 +18,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./tjdft.db",
+        default_factory=lambda: _default_database_url(),
         description="Database connection URL",
     )
 
@@ -57,6 +58,23 @@ class Settings(BaseSettings):
         description="Allowed CORS origins",
     )
 
+    # MCP
+    mcp_character_limit: int = Field(
+        default=25000,
+        ge=1000,
+        description="Maximum size (in characters) for MCP tool responses",
+    )
+    mcp_enable_ai_tools: bool = Field(
+        default=False,
+        description="Enable optional AI MCP tools",
+    )
+    mcp_request_timeout_seconds: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=120.0,
+        description="Timeout used by MCP tools for upstream requests",
+    )
+
 
 @lru_cache()
 def get_settings() -> Settings:
@@ -65,3 +83,10 @@ def get_settings() -> Settings:
     This function caches the settings to avoid re-reading the .env file.
     """
     return Settings()
+
+
+def _default_database_url() -> str:
+    """Return a writable SQLite path for the current runtime."""
+    if os.getenv("VERCEL"):
+        return "sqlite+aiosqlite:////tmp/tjdft.db"
+    return "sqlite+aiosqlite:///./tjdft.db"

@@ -1,0 +1,60 @@
+# Development Docker Compose for TJDFT API
+# For local development on MacBook M3
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tjdft-api-dev
+    restart: "no"
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/tjdft.db
+      - REDIS_URL=redis://redis:6379
+      - CACHE_TTL=3600
+      - DEBUG=true
+    volumes:
+      # Mount source code for hot reload
+      - ./app:/app/app
+      - tjdft-dev-data:/app/data
+    depends_on:
+      - redis
+    networks:
+      - tjdft-network
+    # Override command for development with auto-reload
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  redis:
+    image: redis:7-alpine
+    container_name: tjdft-redis-dev
+    restart: "no"
+    networks:
+      - tjdft-network
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  # Redis Commander for GUI access to Redis
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tjdft-redis-ui
+    restart: "no"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - tjdft-network
+    profiles:
+      - tools
+
+volumes:
+  tjdft-dev-data:
+    driver: local
+
+networks:
+  tjdft-network:
+    driver: bridge

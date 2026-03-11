@@ -1,0 +1,1621 @@
+{
+  "_meta": {
+    "descricao": "Dicionário da API de Jurisprudência do TJDFT",
+    "endpoint_busca": "POST https://jurisdf.tjdft.jus.br/api/v1/pesquisa",
+    "endpoint_metadata": "GET https://jurisdf.tjdft.jus.br/api/v1/pesquisa",
+    "versao_api": "v1",
+    "total_acórdaos": 517680,
+    "bases_disponiveis": {
+      "acordaos": {
+        "descricao": "Acórdãos do TJDFT",
+        "total": 444579
+      },
+      "acordaos-tr": {
+        "descricao": "Acórdãos de Turmas Recursais",
+        "total": 73101
+      },
+      "decisoes-monocraticas": {
+        "descricao": "Decisões monocráticas (1ª e 2ª instância)",
+        "total": 13831
+      }
+    },
+    "total_decisoes": 531511,
+    "fonte": "https://www.tjdft.jus.br/transparencia/tecnologia-da-informacao-e-comunicacao/dados-abertos/webservice-ou-api",
+    "apis_disponíveis": [
+      "jurisprudencia",
+      "rh_teletrabalho",
+      "rh_estagiarios",
+      "rh_cedidos",
+      "rh_tlp",
+      "rh_matriz_cargos"
+    ]
+  },
+  "payload_busca": {
+    "campos_obrigatorios": {
+      "query": {
+        "tipo": "string",
+        "descricao": "Texto de busca em linguagem natural ou vazio ''"
+      }
+    },
+    "campos_opcionais": {
+      "pagina": {
+        "tipo": "int",
+        "padrao": 0,
+        "minimo": 0,
+        "descricao": "Página (0-indexed)"
+      },
+      "tamanho": {
+        "tipo": "int",
+        "padrao": 20,
+        "minimo": 1,
+        "maximo": 40,
+        "descricao": "Resultados por página"
+      },
+      "termosAcessorios": {
+        "tipo": "array",
+        "descricao": "Lista de filtros adicionais [{campo, valor}]",
+        "campos_validos": {
+          "nomeRelator": "Nome exato do relator (ver lista relatores)",
+          "descricaoClasseCnj": "Classe processual (ver lista classes)",
+          "descricaoOrgaoJulgador": "Órgão julgador (ver lista orgaos)",
+          "base": "Base documental: 'acordaos' ou 'decisoes'",
+          "nomeRevisor": "Nome exato do revisor (ver lista revisores)",
+          "nomeRelatorDesignado": "Nome do relator designado (ver lista designados)",
+          "subbase": "Subbase: 'acordaos', 'acordaos-tr', 'decisoes-monocraticas'",
+          "processo": "Número CNJ do processo (ex: 0702180-36.2024.8.07.0001)",
+          "uuid": "UUID da decisão",
+          "identificador": "ID numérico da decisão",
+          "origem": "Origem da decisão"
+        }
+      }
+    },
+    "campos_nao_suportados": [
+      "q",
+      "query_string",
+      "data_inicio",
+      "data_fim",
+      "dataInicio",
+      "dataFim",
+      "ordenacao",
+      "direcao",
+      "sort",
+      "revisor",
+      "relatorDesignado",
+      "segredoJustica"
+    ]
+  },
+  "resposta": {
+    "hits": {
+      "value": "Total de documentos encontrados (int)"
+    },
+    "paginacao": {
+      "pagina": "Página atual (0-indexed)",
+      "tamanho": "Resultados por página"
+    },
+    "agregacoes": {
+      "relator": "Lista [{nome, total}] dos relatores encontrados",
+      "relatorDesignado": "Lista [{nome, total}] dos relatores designados",
+      "revisor": "Lista [{nome, total}] dos revisores",
+      "orgaoJulgador": "Lista [{nome, total}] dos órgãos julgadores",
+      "base": "Lista [{nome, total, filhos}] das bases",
+      "segredoJustica": "Lista [{nome, total}]",
+      "classe": "Lista [{nome, total}] das classes processuais"
+    },
+    "registros": {
+      "descricao": "Lista de decisões",
+      "campos": {
+        "sequencial": "int - Posição na página",
+        "base": "str - Base: 'acordaos' ou 'acordaos-tr'",
+        "subbase": "str - Subbase documental",
+        "uuid": "str - Identificador único UUID",
+        "identificador": "str - ID numérico do acórdão",
+        "dataJulgamento": "str - Data ISO 8601 (ex: 2025-03-04T03:00:00.000Z)",
+        "dataPublicacao": "str - Data ISO 8601 de publicação",
+        "decisao": "str - Dispositivo da decisão",
+        "ementa": "str - Ementa completa",
+        "localDePublicacao": "str - Local (ex: PJe, DJDFT)",
+        "processo": "str - Número CNJ do processo",
+        "nomeRelator": "str - Nome do relator",
+        "relatorAtivo": "bool - Se relator ainda está ativo",
+        "uf": "str - UF (sempre 'DF')",
+        "segredoJustica": "bool",
+        "turmaRecursal": "bool - Se é turma recursal",
+        "descricaoOrgaoJulgador": "str - Nome do órgão julgador",
+        "versao": "str - Versão do documento",
+        "codigoClasseCnj": "int - Código CNJ da classe",
+        "codigoSistjOrgaoJulgador": "int - Código interno do órgão",
+        "inteiroTeorHtml": "str - Inteiro teor em HTML (pode ser 'Inteiro Teor indisponível.')",
+        "marcadores": "dict - Trechos marcados (ementa, decisao, etc.)",
+        "possuiInteiroTeor": "bool - Se inteiro teor está disponível"
+      }
+    },
+    "registro_decisao_monocratica": {
+      "descricao": "Estrutura de registro quando subbase=decisoes-monocraticas",
+      "campos_presentes": [
+        "sequencial",
+        "base",
+        "subbase",
+        "uuid",
+        "identificador",
+        "dataPublicacao",
+        "ementa",
+        "processo",
+        "nomeRelator",
+        "descricaoOrgaoJulgador",
+        "versao",
+        "codigoClasseCnj",
+        "codigoSistjOrgaoJulgador",
+        "inteiroTeor",
+        "marcadores",
+        "jurisprudenciaEmFoco",
+        "descricaoOrgao",
+        "possuiInteiroTeor"
+      ],
+      "campos_ausentes_vs_acordaos": [
+        "dataJulgamento",
+        "decisao",
+        "localDePublicacao",
+        "relatorAtivo",
+        "uf",
+        "segredoJustica",
+        "turmaRecursal"
+      ],
+      "diferenca_inteiroTeor": "Campo 'inteiroTeor' (string) ao invés de 'inteiroTeorHtml'"
+    }
+  },
+  "limitacoes": [
+    "Filtro por data (dataJulgamento/dataPublicacao) causa erro 500 — não suportado",
+    "Sem ordenação personalizada (sort/direcao rejeitados com 400)",
+    "Máximo de 40 resultados por página (tamanho > 40 retorna erro 400)",
+    "Paginação 0-indexed (primeira página = 0)",
+    "nomeRelator/nomeRevisor/nomeRelatorDesignado devem corresponder EXATAMENTE às listas do GET /pesquisa",
+    "Magistrados de 1ª instância não aparecem na lista de relatores — buscar via 'query' ou 'processo'",
+    "query vazio ('') é válido e retorna todos os registros com os filtros aplicados",
+    "Decisões monocráticas (subbase=decisoes-monocraticas) têm estrutura diferente: sem dataJulgamento, decisao, localDePublicacao, relatorAtivo, turmaRecursal",
+    "Campos rejeitados no termosAcessorios: revisor, relatorDesignado, segredoJustica"
+  ],
+  "estrategias_busca": {
+    "por_relator": {
+      "descricao": "Buscar decisões de um relator específico",
+      "exemplo": {
+        "query": "",
+        "termosAcessorios": [
+          {
+            "campo": "nomeRelator",
+            "valor": "CARMEN BITTENCOURT"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    },
+    "por_tema_e_relator": {
+      "descricao": "Buscar por tema com filtro de relator",
+      "exemplo": {
+        "query": "responsabilidade civil",
+        "termosAcessorios": [
+          {
+            "campo": "nomeRelator",
+            "valor": "GEORGE LOPES"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    },
+    "por_classe": {
+      "descricao": "Filtrar por classe processual",
+      "exemplo": {
+        "query": "dano moral",
+        "termosAcessorios": [
+          {
+            "campo": "descricaoClasseCnj",
+            "valor": "APELAÇÃO CÍVEL"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    },
+    "por_orgao": {
+      "descricao": "Filtrar por órgão julgador",
+      "exemplo": {
+        "query": "contrato",
+        "termosAcessorios": [
+          {
+            "campo": "descricaoOrgaoJulgador",
+            "valor": "1ª TURMA CÍVEL"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    },
+    "filtros_combinados": {
+      "descricao": "Múltiplos filtros simultaneamente",
+      "exemplo": {
+        "query": "locação",
+        "termosAcessorios": [
+          {
+            "campo": "nomeRelator",
+            "valor": "ANA CANTARINO"
+          },
+          {
+            "campo": "descricaoClasseCnj",
+            "valor": "APELAÇÃO CÍVEL"
+          },
+          {
+            "campo": "descricaoOrgaoJulgador",
+            "valor": "5ª TURMA CÍVEL"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    },
+    "por_base": {
+      "descricao": "Filtrar por base documental",
+      "exemplo": {
+        "query": "recurso",
+        "termosAcessorios": [
+          {
+            "campo": "base",
+            "valor": "acordaos-tr"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    },
+    "busca_ampla_sem_tema": {
+      "descricao": "Listar decisões de relator sem filtro de tema (query vazio)",
+      "exemplo": {
+        "query": "",
+        "termosAcessorios": [
+          {
+            "campo": "nomeRelator",
+            "valor": "FLAVIO ROSTIROLA"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 40
+      }
+    },
+    "autocomplete_relator": {
+      "descricao": "Se nome incompleto, buscar na lista de relatores e usar correspondência parcial",
+      "procedimento": "GET /api/v1/pesquisa -> campo 'relatores' -> filtrar por substring"
+    },
+    "por_revisor": {
+      "descricao": "Buscar decisões em que um magistrado atuou como revisor",
+      "exemplo": {
+        "query": "",
+        "termosAcessorios": [
+          {
+            "campo": "nomeRevisor",
+            "valor": "JANSEN FIALHO DE ALMEIDA"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    },
+    "por_processo": {
+      "descricao": "Buscar decisões de um processo específico pelo número CNJ",
+      "exemplo": {
+        "query": "",
+        "termosAcessorios": [
+          {
+            "campo": "processo",
+            "valor": "0702180-36.2024.8.07.0001"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 10
+      }
+    },
+    "decisoes_monocraticas": {
+      "descricao": "Buscar apenas decisões monocráticas (inclui 1ª instância)",
+      "exemplo": {
+        "query": "tutela antecipada",
+        "termosAcessorios": [
+          {
+            "campo": "subbase",
+            "valor": "decisoes-monocraticas"
+          }
+        ],
+        "pagina": 0,
+        "tamanho": 20
+      }
+    }
+  },
+  "relatores": [
+    "ADELITH CASTRO DE CARVALHO LOPES",
+    "ADEMAR SILVA DE VASCONCELOS",
+    "AISTON HENRIQUE DE SOUSA",
+    "ALFEU MACHADO",
+    "ALMIR ANDRADE DE FREITAS",
+    "ALVARO CIARLINI",
+    "ALVARO LUIZ CHAN JORGE",
+    "ANA CANTARINO",
+    "ANA CLAUDIA LOIOLA DE MORAIS MENDES",
+    "ANA MARIA AMARANTE",
+    "ANA MARIA FERREIRA DA SILVA",
+    "ANDRE GOMES ALVES",
+    "ANGELO PASSARELI",
+    "ANTONINHO LOPES",
+    "ANTONIO FERNANDES DA LUZ",
+    "ANTONIO HONORIO",
+    "ARILSON RAMOS",
+    "ARLINDO MARES",
+    "ARNALDO CORRÊA SILVA",
+    "ARNOLDO CAMANHO DE ASSIS",
+    "ARQUIBALDO CARNEIRO PORTELA",
+    "ASDRUBAL NASCIMENTO",
+    "ASIEL HENRIQUE DE SOUSA",
+    "BENITO TIEZZI",
+    "CAIO BRUCOLI SEMBONGI",
+    "CAMILLE GONÇALVES JAVARINE FERREIRA",
+    "CAMPOS AMARAL",
+    "CANDIDO COLOMBO",
+    "CARLOS ALBERTO MARTINS FILHO",
+    "CARLOS AUGUSTO FARIA",
+    "CARLOS BISMARCK PISKE DE AZEVEDO BARBOSA",
+    "CARLOS EDUARDO",
+    "CARLOS PIRES SOARES NETO",
+    "CARLOS RODRIGUES",
+    "CARMELITA BRASIL",
+    "CARMEN BITTENCOURT",
+    "CARNEIRO DE ULHOA",
+    "CESAR LOYOLA",
+    "CRUZ MACEDO",
+    "DANIEL FELIPE MACHADO",
+    "DANTE GUERRERA",
+    "DARCY RIBEIRO",
+    "DELEANE CAMARGO",
+    "DEMETRIUS GOMES CAVALCANTI",
+    "DEOCLECIANO QUEIROGA",
+    "DIAULAS COSTA RIBEIRO",
+    "DIRCEU DE FARIA",
+    "DIVA LUCY DE FARIA PEREIRA",
+    "DONIZETI  APARECIDO",
+    "DUARTE DE AZEVEDO",
+    "DÁCIO VIEIRA",
+    "EDI MARIA COUTINHO BIZZI",
+    "EDILSON ENEDINO DAS CHAGAS",
+    "EDITTE PATRÍCIO",
+    "EDMAR RAMIRO CORREIA",
+    "EDMUNDO MINERVINO",
+    "EDSON SMANIOTTO",
+    "EDUARDO HENRIQUE ROSAS",
+    "EDUARDO OLIVEIRA",
+    "EDUARDO RIBEIRO",
+    "ELMANO CAVALCANTI DE FARIAS",
+    "ESDRAS NEVES",
+    "ESTEVAM MAIA",
+    "EUSTÁQUIO DE CASTRO",
+    "EUTALIA MACIEL",
+    "EVANDRO NEIVA DE AMORIM",
+    "EVERARDS MOTA E MATOS",
+    "FABRÍCIO FONTOURA BEZERRA",
+    "FELIPE VIDIGAL DE ANDRADE SERRA",
+    "FERNANDO HABIBE",
+    "FERNANDO TAVERNARD",
+    "FIGUEIREDO BRANCO",
+    "FLAVIO ROSTIROLA",
+    "FLÁVIO AUGUSTO MARTINS LEITE",
+    "FLÁVIO FERNANDO ALMEIDA DA FONSECA",
+    "FRANCISCO ANTONIO ALVES DE OLIVEIRA",
+    "FÁBIO EDUARDO MARQUES",
+    "FÁTIMA RAFAEL",
+    "GABRIELA JARDON GUIMARAES DE FARIA",
+    "GEILZA FATIMA CAVALCANTI DINIZ",
+    "GEORGE LOPES",
+    "GERALDO JOFFILY",
+    "GETULIO PINHEIRO",
+    "GETÚLIO DE MORAES OLIVEIRA",
+    "GILBERTO PEREIRA DE OLIVEIRA",
+    "GILMAR DE JESUS GOMES DA SILVA",
+    "GILMAR TADEU SORIANO",
+    "GISELLE ROCHA RAPOSO",
+    "GISLENE PINHEIRO DE OLIVEIRA",
+    "GUIMARÃES SOUZA",
+    "HAYDEVALDA SAMPAIO",
+    "HECTOR VALVERDE SANTANNA",
+    "HELLÁDIO MONTEIRO",
+    "HENRIQUE BRAUNE",
+    "HERMENEGILDO GONÇALVES",
+    "HILÁRIO DE VASCONCELOS",
+    "HUGO AULER",
+    "HUMBERTO EUSTAQUIO",
+    "HUMBERTO ULHÔA",
+    "IRACEMA MIRANDA E SILVA",
+    "IRAJA PIMENTEL",
+    "IRAN DE LIMA",
+    "ISABEL PINTO",
+    "J.J. COSTA CARVALHO",
+    "JAIR SOARES",
+    "JAMES EDUARDO OLIVEIRA",
+    "JANSEN FIALHO DE ALMEIDA",
+    "JERONYMO DE SOUZA",
+    "JESUINO RISSATO",
+    "JOAQUIM SOUZA",
+    "JOAZIL GARDES",
+    "JOSAPHÁ FRANCISCO DOS SANTOS",
+    "JOSE COLOMBO",
+    "JOSE DILERMANDO",
+    "JOSE FERNANDES",
+    "JOSE FIRMO REIS SOUB",
+    "JOSE JULIO",
+    "JOSE RONALDO ROSSATO",
+    "JOSÉ DE AQUINO",
+    "JOSÉ DIVINO",
+    "JOSÉ GUILHERME",
+    "JOÃO BATISTA GONÇALVES DA SILVA",
+    "JOÃO BATISTA TEIXEIRA",
+    "JOÃO DA MATTA E SILVA",
+    "JOÃO EGMONT",
+    "JOÃO LUÍS FISCHER DIAS",
+    "JOÃO MARIOSI",
+    "JOÃO TIMÓTEO DE OLIVEIRA",
+    "JULIO ROBERTO DOS REIS",
+    "JUSCELINO RIBEIRO",
+    "JÚLIO DE OLIVEIRA",
+    "LEANDRO BORGES DE FIGUEIREDO",
+    "LECIR MANOEL DA LUZ",
+    "LEIA ESTEVES",
+    "LEILA ARLANCH",
+    "LEILA CURY",
+    "LEONARDO ROSCOE BESSA",
+    "LEONOR AGUENA",
+    "LIA FANUCK",
+    "LILA DUARTE",
+    "LIZANDRO GARCIA GOMES FILHO",
+    "LUCIANO MOREIRA VASCONCELLOS",
+    "LUCIMEIRE MARIA DA SILVA",
+    "LUIS EDUARDO YATSUDA ARIMA",
+    "LUIS MARTIUS HOLANDA BEZERRA JUNIOR",
+    "LUIZ CLAUDIO ABREU",
+    "LUIZ VICENTE CERNICCHIARO",
+    "LUÍS GUSTAVO B. DE OLIVEIRA",
+    "LÉCIO RESENDE",
+    "LÚCIO ARANTES",
+    "MANOEL COELHO",
+    "MARA SILDA NUNES DE ALMEIDA",
+    "MARCELO TADEU DE ASSUNCAO SOBRINHO",
+    "MARCIO RIBEIRO",
+    "MARCO ANTONIO DO AMARAL",
+    "MARGARETH CRISTINA BECKER",
+    "MARIA APARECIDA FERNANDES",
+    "MARIA BEATRIZ PARRILHA",
+    "MARIA DE LOURDES ABREU",
+    "MARIA GRAZIELA BARBOSA DANTAS",
+    "MARIA ISABEL DE LOURDES SILVA",
+    "MARIA IVATÔNIA",
+    "MARIA THEREZA BRAGA",
+    "MARILIA DE AVILA E SILVA SAMPAIO",
+    "MARIO BRASIL",
+    "MARIO HENRIQUE SILVEIRA DE ALMEIDA",
+    "MARIO MACHADO",
+    "MAURICIO SILVA MIRANDA",
+    "MAURO RENAN BITTENCOURT",
+    "MELLO MARTINS",
+    "MILTON SEBASTIAO BARBOSA",
+    "MÁRIO-ZAM BELMIRO",
+    "NANCY ANDRIGHI",
+    "NATANAEL CAETANO",
+    "NILSONI DE FREITAS CUSTODIO",
+    "NÍDIA CORRÊA LIMA",
+    "NÍVIO GONÇALVES",
+    "ORIANA PISKE",
+    "OSWALDO SILVA",
+    "OTÁVIO AUGUSTO",
+    "P. A. ROSA DE FARIAS",
+    "PAULO EVANDRO",
+    "PAULO GARCIA",
+    "PAULO ROGÉRIO SANTOS GIORDANO",
+    "PEDRO DE ARAUJO YUNG-TAY NETO",
+    "PINGRET DE CARVALHO",
+    "RAFAEL RODRIGUES DE CASTRO SILVA",
+    "RAIMUNDO FERREIRA",
+    "RENATO SCUSSEL",
+    "RIBEIRO DE SOUSA",
+    "RITA DE CÁSSIA DE CERQUEIRA LIMA ROCHA",
+    "ROBERTO FREITAS FILHO",
+    "ROBERTO SANTOS",
+    "ROBERVAL CASEMIRO BELINATI",
+    "ROBSON BARBOSA DE AZEVEDO",
+    "ROBSON TEIXEIRA DE FREITAS",
+    "ROMEU GONZAGA NEIVA",
+    "ROMEU JOBIM",
+    "ROMILDO BUENO",
+    "ROMULO DE ARAUJO MENDES",
+    "ROMÃO C. OLIVEIRA",
+    "SANDOVAL OLIVEIRA",
+    "SANDRA DE SANTIS",
+    "SANDRA REVES",
+    "SEBASTIÃO COELHO",
+    "SILVA LEMOS",
+    "SILVANA DA SILVA CHAVES",
+    "SILVANIO BARBOSA DOS SANTOS",
+    "SIMONE GARCIA PENA",
+    "SIMONE LUCINDO",
+    "SONÍRIA ROCHA CAMPOS D'ASSUNÇÃO",
+    "SOUZA E AVILA",
+    "SÉRGIO BITTENCOURT",
+    "SÉRGIO ROCHA",
+    "TARCISIO DE MORAES SOUZA",
+    "TEÓFILO CAETANO",
+    "TÂNIA RORIZ",
+    "VALTENIO MENDES",
+    "VALTER XAVIER",
+    "VASQUEZ CRUXÊN",
+    "VAZ DE MELLO",
+    "VERA ANDRIGHI",
+    "VILMAR JOSÉ BARRETO PINHEIRO",
+    "VITOR FELTRIM BARBOSA",
+    "WALDIR LEÔNCIO LOPES JÚNIOR",
+    "WALDIR MEUREN",
+    "WELLINGTON MEDEIROS",
+    "WILDE MARIA SILVA JUSTINIANO RIBEIRO"
+  ],
+  "revisores": [
+    "ALFEU MACHADO",
+    "ALVARO CIARLINI",
+    "ANA CANTARINO",
+    "ANA MARIA AMARANTE",
+    "ANGELO PASSARELI",
+    "ARNALDO CORRÊA SILVA",
+    "ARNOLDO CAMANHO DE ASSIS",
+    "ASIEL HENRIQUE DE SOUSA",
+    "CARLOS PIRES SOARES NETO",
+    "CARLOS RODRIGUES",
+    "CARMELITA BRASIL",
+    "CESAR LOYOLA",
+    "CRUZ MACEDO",
+    "DEMETRIUS GOMES CAVALCANTI",
+    "DIAULAS COSTA RIBEIRO",
+    "DIVA LUCY DE FARIA PEREIRA",
+    "ESDRAS NEVES",
+    "FERNANDO HABIBE",
+    "FLAVIO ROSTIROLA",
+    "FÁTIMA RAFAEL",
+    "GEORGE LOPES",
+    "GETÚLIO DE MORAES OLIVEIRA",
+    "GILBERTO PEREIRA DE OLIVEIRA",
+    "GISLENE PINHEIRO DE OLIVEIRA",
+    "HECTOR VALVERDE SANTANNA",
+    "HUMBERTO ULHÔA",
+    "J.J. COSTA CARVALHO",
+    "JAIR SOARES",
+    "JAMES EDUARDO OLIVEIRA",
+    "JANSEN FIALHO DE ALMEIDA",
+    "JESUINO RISSATO",
+    "JOSAPHÁ FRANCISCO DOS SANTOS",
+    "JOSÉ DIVINO",
+    "JOSÉ GUILHERME",
+    "JOÃO BATISTA TEIXEIRA",
+    "JOÃO EGMONT",
+    "JOÃO TIMÓTEO DE OLIVEIRA",
+    "LEILA ARLANCH",
+    "LUCIANO MOREIRA VASCONCELLOS",
+    "LUÍS GUSTAVO B. DE OLIVEIRA",
+    "MARIA DE LOURDES ABREU",
+    "MARIA IVATÔNIA",
+    "MARIO MACHADO",
+    "MÁRIO-ZAM BELMIRO",
+    "NILSONI DE FREITAS CUSTODIO",
+    "NÍDIA CORRÊA LIMA",
+    "OTÁVIO AUGUSTO",
+    "ROBERVAL CASEMIRO BELINATI",
+    "ROBSON BARBOSA DE AZEVEDO",
+    "ROMEU GONZAGA NEIVA",
+    "ROMULO DE ARAUJO MENDES",
+    "ROMÃO C. OLIVEIRA",
+    "SANDOVAL OLIVEIRA",
+    "SANDRA DE SANTIS",
+    "SEBASTIÃO COELHO",
+    "SILVA LEMOS",
+    "SILVANIO BARBOSA DOS SANTOS",
+    "SIMONE LUCINDO",
+    "SOUZA E AVILA",
+    "SÉRGIO ROCHA",
+    "TEÓFILO CAETANO",
+    "VERA ANDRIGHI",
+    "WALDIR LEÔNCIO LOPES JÚNIOR"
+  ],
+  "designados": [
+    "ADELITH CASTRO DE CARVALHO LOPES",
+    "AISTON HENRIQUE DE SOUSA",
+    "ALFEU MACHADO",
+    "ALMIR ANDRADE DE FREITAS",
+    "ALVARO CIARLINI",
+    "ALVARO LUIZ CHAN JORGE",
+    "ANA CANTARINO",
+    "ANA CLAUDIA LOIOLA DE MORAIS MENDES",
+    "ANA MARIA AMARANTE",
+    "ANA MARIA FERREIRA DA SILVA",
+    "ANGELO PASSARELI",
+    "ANTONINHO LOPES",
+    "ANTONIO FERNANDES DA LUZ",
+    "ANTONIO HONORIO",
+    "ARLINDO MARES",
+    "ARNALDO CORRÊA SILVA",
+    "ARNOLDO CAMANHO DE ASSIS",
+    "ARQUIBALDO CARNEIRO PORTELA",
+    "ASDRUBAL NASCIMENTO",
+    "ASIEL HENRIQUE DE SOUSA",
+    "BENITO TIEZZI",
+    "CAMPOS AMARAL",
+    "CANDIDO COLOMBO",
+    "CARLOS ALBERTO MARTINS FILHO",
+    "CARLOS AUGUSTO FARIA",
+    "CARLOS PIRES SOARES NETO",
+    "CARLOS RODRIGUES",
+    "CARMELITA BRASIL",
+    "CARMEN BITTENCOURT",
+    "CARNEIRO DE ULHOA",
+    "CESAR LOYOLA",
+    "CRUZ MACEDO",
+    "DANIEL FELIPE MACHADO",
+    "DANTE GUERRERA",
+    "DARCY RIBEIRO",
+    "DEMETRIUS GOMES CAVALCANTI",
+    "DEOCLECIANO QUEIROGA",
+    "DIAULAS COSTA RIBEIRO",
+    "DIRCEU DE FARIA",
+    "DIVA LUCY DE FARIA PEREIRA",
+    "DUARTE DE AZEVEDO",
+    "DÁCIO VIEIRA",
+    "EDI MARIA COUTINHO BIZZI",
+    "EDILSON ENEDINO DAS CHAGAS",
+    "EDITTE PATRÍCIO",
+    "EDMUNDO MINERVINO",
+    "EDSON SMANIOTTO",
+    "EDUARDO HENRIQUE ROSAS",
+    "EDUARDO OLIVEIRA",
+    "EDUARDO RIBEIRO",
+    "ELMANO CAVALCANTI DE FARIAS",
+    "ENILTON ALVES FERNANDES",
+    "ESDRAS NEVES",
+    "ESTEVAM MAIA",
+    "EUSTÁQUIO DE CASTRO",
+    "EUTALIA MACIEL",
+    "EVERARDS MOTA E MATOS",
+    "FABRÍCIO FONTOURA BEZERRA",
+    "FERNANDO HABIBE",
+    "FERNANDO TAVERNARD",
+    "FIGUEIREDO BRANCO",
+    "FLAVIO ROSTIROLA",
+    "FLÁVIO AUGUSTO MARTINS LEITE",
+    "FLÁVIO FERNANDO ALMEIDA DA FONSECA",
+    "FRANCISCO ANTONIO ALVES DE OLIVEIRA",
+    "FÁBIO EDUARDO MARQUES",
+    "FÁTIMA RAFAEL",
+    "GABRIELA JARDON GUIMARAES DE FARIA",
+    "GEILZA FATIMA CAVALCANTI DINIZ",
+    "GEORGE LOPES",
+    "GERALDO JOFFILY",
+    "GETULIO PINHEIRO",
+    "GETÚLIO DE MORAES OLIVEIRA",
+    "GILBERTO PEREIRA DE OLIVEIRA",
+    "GILMAR TADEU SORIANO",
+    "GISELLE ROCHA RAPOSO",
+    "GISLENE PINHEIRO DE OLIVEIRA",
+    "GUIMARÃES SOUZA",
+    "HAYDEVALDA SAMPAIO",
+    "HECTOR VALVERDE SANTANNA",
+    "HELLÁDIO MONTEIRO",
+    "HENRIQUE BRAUNE",
+    "HERMENEGILDO GONÇALVES",
+    "HILÁRIO DE VASCONCELOS",
+    "HUGO AULER",
+    "HUMBERTO ULHÔA",
+    "IRACEMA MIRANDA E SILVA",
+    "IRAJA PIMENTEL",
+    "IRAN DE LIMA",
+    "ISABEL PINTO",
+    "J.J. COSTA CARVALHO",
+    "JAIR SOARES",
+    "JAMES EDUARDO OLIVEIRA",
+    "JANSEN FIALHO DE ALMEIDA",
+    "JERONYMO DE SOUZA",
+    "JESUINO RISSATO",
+    "JOAQUIM SOUZA",
+    "JOAZIL GARDES",
+    "JOSAPHÁ FRANCISCO DOS SANTOS",
+    "JOSE COLOMBO",
+    "JOSE DILERMANDO",
+    "JOSE FERNANDES",
+    "JOSE FIRMO REIS SOUB",
+    "JOSE JULIO",
+    "JOSE RONALDO ROSSATO",
+    "JOSÉ DE AQUINO",
+    "JOSÉ DIVINO",
+    "JOSÉ GUILHERME",
+    "JOÃO BATISTA GONÇALVES DA SILVA",
+    "JOÃO BATISTA TEIXEIRA",
+    "JOÃO EGMONT",
+    "JOÃO LUÍS FISCHER DIAS",
+    "JOÃO MARIOSI",
+    "JOÃO TIMÓTEO DE OLIVEIRA",
+    "JULIO ROBERTO DOS REIS",
+    "JUSCELINO RIBEIRO",
+    "JÚLIO DE OLIVEIRA",
+    "LEANDRO BORGES DE FIGUEIREDO",
+    "LECIR MANOEL DA LUZ",
+    "LEILA ARLANCH",
+    "LEONARDO ROSCOE BESSA",
+    "LEONOR AGUENA",
+    "LIA FANUCK",
+    "LILA DUARTE",
+    "LIZANDRO GARCIA GOMES FILHO",
+    "LUCIANO MOREIRA VASCONCELLOS",
+    "LUCIMEIRE MARIA DA SILVA",
+    "LUIS EDUARDO YATSUDA ARIMA",
+    "LUIS MARTIUS HOLANDA BEZERRA JUNIOR",
+    "LUIZ CLAUDIO ABREU",
+    "LUIZ VICENTE CERNICCHIARO",
+    "LUÍS GUSTAVO B. DE OLIVEIRA",
+    "LÉCIO RESENDE",
+    "LÚCIO ARANTES",
+    "MANOEL COELHO",
+    "MARCIO RIBEIRO",
+    "MARCO ANTONIO DO AMARAL",
+    "MARGARETH CRISTINA BECKER",
+    "MARIA APARECIDA FERNANDES",
+    "MARIA BEATRIZ PARRILHA",
+    "MARIA DE LOURDES ABREU",
+    "MARIA ISABEL DE LOURDES SILVA",
+    "MARIA IVATÔNIA",
+    "MARIA THEREZA BRAGA",
+    "MARILIA DE AVILA E SILVA SAMPAIO",
+    "MARIO BRASIL",
+    "MARIO MACHADO",
+    "MAURICIO SILVA MIRANDA",
+    "MAURO RENAN BITTENCOURT",
+    "MELLO MARTINS",
+    "MILTON SEBASTIAO BARBOSA",
+    "MÁRIO-ZAM BELMIRO",
+    "NANCY ANDRIGHI",
+    "NATANAEL CAETANO",
+    "NILSONI DE FREITAS CUSTODIO",
+    "NÍDIA CORRÊA LIMA",
+    "NÍVIO GONÇALVES",
+    "OSWALDO SILVA",
+    "OTÁVIO AUGUSTO",
+    "P. A. ROSA DE FARIAS",
+    "PAULO EVANDRO",
+    "PAULO GARCIA",
+    "PINGRET DE CARVALHO",
+    "RAIMUNDO FERREIRA",
+    "RENATO SCUSSEL",
+    "RIBEIRO DE SOUSA",
+    "RITA DE CÁSSIA DE CERQUEIRA LIMA ROCHA",
+    "ROBERTO FREITAS FILHO",
+    "ROBERTO SANTOS",
+    "ROBERVAL CASEMIRO BELINATI",
+    "ROBSON BARBOSA DE AZEVEDO",
+    "ROBSON TEIXEIRA DE FREITAS",
+    "ROMEU GONZAGA NEIVA",
+    "ROMEU JOBIM",
+    "ROMILDO BUENO",
+    "ROMULO DE ARAUJO MENDES",
+    "ROMÃO C. OLIVEIRA",
+    "SANDOVAL OLIVEIRA",
+    "SANDRA DE SANTIS",
+    "SANDRA REVES",
+    "SEBASTIÃO COELHO",
+    "SILVA LEMOS",
+    "SILVANA DA SILVA CHAVES",
+    "SILVANIO BARBOSA DOS SANTOS",
+    "SIMONE LUCINDO",
+    "SONÍRIA ROCHA CAMPOS D'ASSUNÇÃO",
+    "SOUZA E AVILA",
+    "SÉRGIO BITTENCOURT",
+    "SÉRGIO ROCHA",
+    "TEÓFILO CAETANO",
+    "TÂNIA RORIZ",
+    "VALTENIO MENDES",
+    "VALTER XAVIER",
+    "VASQUEZ CRUXÊN",
+    "VAZ DE MELLO",
+    "VERA ANDRIGHI",
+    "WALDIR LEÔNCIO LOPES JÚNIOR",
+    "WALDIR MEUREN",
+    "WELLINGTON MEDEIROS",
+    "WILDE MARIA SILVA JUSTINIANO RIBEIRO"
+  ],
+  "classes": [
+    "AGRAVO",
+    "AGRAVO DE EXECUÇÃO PENAL",
+    "AGRAVO DE INSTRUMENTO",
+    "AGRAVO DE INSTRUMENTO EM RECURSO ESPECIAL",
+    "AGRAVO DE INSTRUMENTO EM RECURSO EXTRAORDINÁRIO",
+    "AGRAVO EM RECURSO ESPECIAL",
+    "AGRAVO EM RECURSO ESPECIAL E EXTRAORDINÁRIO",
+    "AGRAVO EM RECURSO EXTRAORDINÁRIO",
+    "AGRAVO INTERNO",
+    "AGRAVO INTERNO CRIMINAL",
+    "AGRAVO INTERNO CÍVEL",
+    "AGRAVO REGIMENTAL",
+    "AGRAVO REGIMENTAL CRIMINAL",
+    "AGRAVO REGIMENTAL CÍVEL",
+    "AGRAVO REGIMENTAL/INTERNO",
+    "AGRAVOS",
+    "APELAÇÃO",
+    "APELAÇÃO / REEXAME NECESSÁRIO",
+    "APELAÇÃO / REMESSA NECESSÁRIA",
+    "APELAÇÃO CRIMINAL",
+    "APELAÇÃO CÍVEL",
+    "ASSISTÊNCIA JUDICIÁRIA",
+    "AVOCATÓRIA",
+    "AÇÃO CIVIL PÚBLICA CÍVEL",
+    "AÇÃO DIRETA DE INCONSTITUCIONALIDADE",
+    "AÇÃO PENAL - PROCEDIMENTO ORDINÁRIO",
+    "AÇÃO POPULAR",
+    "AÇÃO RESCISÓRIA",
+    "CARTA DE ORDEM CÍVEL",
+    "CARTA TESTEMUNHÁVEL",
+    "CAUTELAR INOMINADA",
+    "CAUTELAR INOMINADA CRIMINAL",
+    "CONFLITO DE COMPETÊNCIA",
+    "CONFLITO DE COMPETÊNCIA CÍVEL",
+    "CONFLITO DE JURISDIÇÃO",
+    "CORREIÇÃO PARCIAL CÍVEL",
+    "CUMPRIMENTO DE SENTENÇA",
+    "CUMPRIMENTO PROVISÓRIO DE DECISÃO",
+    "CUMPRIMENTO PROVISÓRIO DE SENTENÇA",
+    "DESAFORAMENTO DE JULGAMENTO",
+    "DIRETA DE INCONSTITUCIONALIDADE",
+    "DISSÍDIO COLETIVO DE GREVE",
+    "EMBARGOS",
+    "EMBARGOS DE DECLARAÇÃO",
+    "EMBARGOS DE DECLARAÇÃO CRIMINAL",
+    "EMBARGOS DE DECLARAÇÃO CÍVEL",
+    "EMBARGOS DE RETENÇÃO POR BENFEITORIAS",
+    "EMBARGOS DE TERCEIRO",
+    "EMBARGOS DE TERCEIRO CÍVEL",
+    "EMBARGOS INFRINGENTES",
+    "EMBARGOS INFRINGENTES E DE NULIDADE",
+    "EMBARGOS INFRINGENTES NA EXECUÇÃO FISCAL",
+    "EMBARGOS À EXECUÇÃO",
+    "EXCEÇÃO DE IMPEDIMENTO",
+    "EXCEÇÃO DE SUSPEIÇÃO",
+    "EXECUÇÃO DE TÍTULO JUDICIAL",
+    "EXIBIÇÃO DE DOCUMENTO OU COISA CÍVEL",
+    "HABEAS CORPUS",
+    "HABEAS CORPUS CRIMINAL",
+    "HABEAS CORPUS CÍVEL",
+    "HABEAS CORPUS-CIVEL",
+    "HABEAS CORPUS-CRIMINAL",
+    "HABEAS DATA",
+    "HABEAS DATA CRIMINAL",
+    "HABEAS DATA CÍVEL",
+    "HABILITAÇÃO",
+    "INCIDENTE DE ARGUIÇÃO DE INCONSTITUCIONALIDADE CÍVEL",
+    "INCIDENTE DE ASSUNÇÃO DE COMPETÊNCIA",
+    "INCIDENTE DE DESCONSIDERAÇÃO DE PERSONALIDADE JURÍDICA",
+    "INCIDENTE DE IMPEDIMENTO CÍVEL",
+    "INCIDENTE DE RESOLUÇÃO DE DEMANDAS REPETITIVAS",
+    "INCIDENTE DE SUSPEIÇÃO CÍVEL",
+    "INQUÉRITO POLICIAL",
+    "INVENTÁRIO",
+    "LIQUIDAÇÃO DE SENTENÇA PELO PROCEDIMENTO COMUM",
+    "MANDADO DE INJUNÇÃO",
+    "MANDADO DE SEGURANÇA",
+    "MANDADO DE SEGURANÇA COLETIVO",
+    "MANDADO DE SEGURANÇA CRIMINAL",
+    "MANDADO DE SEGURANÇA CÍVEL",
+    "MEDIDAS PROTETIVAS DE URGÊNCIA (LEI MARIA DA PENHA) INFRACIONAL",
+    "NOTIFICAÇÃO",
+    "OPOSIÇÃO",
+    "PEDIDO DE BUSCA E APREENSÃO CRIMINAL",
+    "PEDIDO DE EFEITO SUSPENSIVO À APELAÇÃO",
+    "PEDIDO DE PRISÃO PREVENTIVA",
+    "PEDIDO DE QUEBRA DE SIGILO DE DADOS E/OU TELEFÔNICO",
+    "PEDIDO DE UNIFORMIZAÇÃO DE INTERPRETAÇÃO DE LEI CÍVEL",
+    "PETIÇÃO",
+    "PETIÇÃO CRIMINAL",
+    "PETIÇÃO CÍVEL",
+    "PRECATÓRIO",
+    "PROCEDIMENTO COMUM CÍVEL",
+    "PROCEDIMENTO ORDINÁRIO",
+    "PROCEDIMENTO SUMÁRIO",
+    "PROCESSO ADMINISTRATIVO",
+    "PROCESSO ADMINISTRATIVO DISCIPLINAR EM FACE DE MAGISTRADO",
+    "PROCESSO ADMINISTRATIVO DISCIPLINAR EM FACE DE SERVIDOR",
+    "PROCESSO CÍVEL E DO TRABALHO",
+    "RECLAMAÇÃO",
+    "RECLAMAÇÃO CRIMINAL",
+    "RECUPERAÇÃO JUDICIAL",
+    "RECURSO ADMINISTRATIVO",
+    "RECURSO DE MEDIDA CAUTELAR",
+    "RECURSO DE MEDIDA CAUTELAR CÍVEL",
+    "RECURSO EM SENTIDO ESTRITO",
+    "RECURSO ESPECIAL",
+    "RECURSO EXTRAORDINÁRIO",
+    "RECURSO INOMINADO",
+    "RECURSO INOMINADO CÍVEL",
+    "RECURSO ORDINÁRIO CRIMINAL",
+    "REEXAME NECESSÁRIO",
+    "REMESSA NECESSÁRIA CRIMINAL",
+    "REMESSA NECESSÁRIA CÍVEL",
+    "REPRESENTAÇÃO P/ DECLARAÇÃO DE INDIGNIDADE/INCOMPATIBILIDADE",
+    "REQUISIÇÃO DE PEQUENO VALOR",
+    "RESTAURAÇÃO DE AUTOS",
+    "RESTAURAçãO DE AUTOS",
+    "RESTITUIÇÃO DE COISAS APREENDIDAS",
+    "REVISÃO CRIMINAL",
+    "SEQÜESTRO",
+    "SUSPENSÃO DE SEGURANÇA CÍVEL",
+    "TERMO CIRCUNSTANCIADO",
+    "TUTELA ANTECIPADA ANTECEDENTE",
+    "TUTELA CAUTELAR ANTECEDENTE"
+  ],
+  "orgaos": [
+    {
+      "base": "CONSELHO ESPECIAL",
+      "agregador": false,
+      "variantes": [
+        "CONSELHO ESPECIAL"
+      ]
+    },
+    {
+      "base": "TRIBUNAL PLENO",
+      "agregador": false,
+      "variantes": [
+        "TRIBUNAL PLENO"
+      ]
+    },
+    {
+      "base": "PRESIDÊNCIA",
+      "agregador": false,
+      "variantes": [
+        "PRESIDÊNCIA",
+        "PRESIDENCIA",
+        "Presidência"
+      ]
+    },
+    {
+      "base": "CONSELHO ESPECIAL ADMINISTRATIVO",
+      "agregador": false,
+      "variantes": [
+        "CONSELHO ESPECIAL NO EXERCÍCIO DAS FUNÇÕES ADMINISTRATIVAS",
+        "CONSELHO ESPECIAL ADMINISTRATIVO"
+      ]
+    },
+    {
+      "base": "CONSELHO DA MAGISTRATURA",
+      "agregador": false,
+      "variantes": [
+        "CONSELHO DA MAGISTRATURA"
+      ]
+    },
+    {
+      "base": "TURMAS RECURSAIS",
+      "agregador": true,
+      "variantes": [
+        "1ª TURMA RECURSAL",
+        "2ª TURMA RECURSAL",
+        "3ª TURMA RECURSAL",
+        "TURMA RECURSAL REUNIDA",
+        "TURMAS RECURSAIS REUNIDAS"
+      ]
+    },
+    {
+      "base": "TURMA RECURSAL REUNIDA",
+      "agregador": false,
+      "variantes": [
+        "TURMA RECURSAL REUNIDA"
+      ]
+    },
+    {
+      "base": "TURMAS RECURSAIS REUNIDAS",
+      "agregador": false,
+      "variantes": [
+        "TURMAS RECURSAIS REUNIDAS"
+      ]
+    },
+    {
+      "base": "1ª TURMA RECURSAL",
+      "agregador": false,
+      "variantes": [
+        "1ª TURMA RECURSAL",
+        "1ª TURMA RECURSAL DOS JUIZADOS ESPECIAIS DO DISTRITO FEDERAL",
+        "1ª TURMA RECURSAL DOS JUIZADOS ESPECIAIS",
+        "PRIMEIRA TURMA RECURSAL"
+      ]
+    },
+    {
+      "base": "2ª TURMA RECURSAL",
+      "agregador": false,
+      "variantes": [
+        "2ª TURMA RECURSAL",
+        "2ª Turma Recursal dos Juizados Especiais do Distrito Federal",
+        "2ª TURMA RECURSAL DOS JUIZADOS ESPECIAIS",
+        "SEGUNDA TURMA RECURSAL"
+      ]
+    },
+    {
+      "base": "3ª TURMA RECURSAL",
+      "agregador": false,
+      "variantes": [
+        "3ª TURMA RECURSAL",
+        "3ª Turma Recursal dos Juizados Especiais do Distrito Federal",
+        "3ª TURMA RECURSAL DOS JUIZADOS ESPECIAIS",
+        "TERCEIRA TURMA RECURSAL"
+      ]
+    },
+    {
+      "base": "CÂMARA CRIMINAL",
+      "agregador": false,
+      "variantes": [
+        "CÂMARA CRIMINAL"
+      ]
+    },
+    {
+      "base": "CÂMARAS CÍVEIS",
+      "agregador": true,
+      "variantes": [
+        "1ª CÂMARA CÍVEL",
+        "2ª CÂMARA CÍVEL",
+        "3ª CÂMARA CÍVEL"
+      ]
+    },
+    {
+      "base": "1ª CÂMARA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "1ª CÂMARA CÍVEL"
+      ]
+    },
+    {
+      "base": "2ª CÂMARA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "2ª CÂMARA CÍVEL"
+      ]
+    },
+    {
+      "base": "3ª CÂMARA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "3ª CÂMARA CÍVEL"
+      ]
+    },
+    {
+      "base": "CÂMARA DE UNIFORMIZAÇÃO",
+      "agregador": false,
+      "variantes": [
+        "CÂMARA DE UNIFORMIZAÇÃO"
+      ]
+    },
+    {
+      "base": "TURMA DE UNIFORMIZAÇÃO",
+      "agregador": false,
+      "variantes": [
+        "TURMA DE UNIFORMIZAÇÃO",
+        "TURMA DE  UNIFORMIZAÇÃO",
+        "TURMA DE UNIFORMIZAÇÃO DE JURISPRUDÊNCIA",
+        "Turma de  Uniformização de Jurisprudência"
+      ]
+    },
+    {
+      "base": "TURMAS CRIMINAIS",
+      "agregador": true,
+      "variantes": [
+        "TURMA CRIMINAL",
+        "1ª TURMA CRIMINAL",
+        "2ª TURMA CRIMINAL",
+        "3ª TURMA CRIMINAL"
+      ]
+    },
+    {
+      "base": "TURMA CRIMINAL",
+      "agregador": false,
+      "variantes": [
+        "TURMA CRIMINAL",
+        "Turma Criminal"
+      ]
+    },
+    {
+      "base": "1ª TURMA CRIMINAL",
+      "agregador": false,
+      "variantes": [
+        "1ª TURMA CRIMINAL",
+        "1ª Turma Criminal"
+      ]
+    },
+    {
+      "base": "2ª TURMA CRIMINAL",
+      "agregador": false,
+      "variantes": [
+        "2ª TURMA CRIMINAL",
+        "2ª Turma Criminal"
+      ]
+    },
+    {
+      "base": "3ª TURMA CRIMINAL",
+      "agregador": false,
+      "variantes": [
+        "3ª TURMA CRIMINAL",
+        "3ª Turma Criminal"
+      ]
+    },
+    {
+      "base": "TURMAS CÍVEIS",
+      "agregador": true,
+      "variantes": [
+        "TURMA CÍVEL",
+        "1ª TURMA CÍVEL",
+        "2ª TURMA CÍVEL",
+        "3ª TURMA CÍVEL",
+        "4ª TURMA CÍVEL",
+        "5ª TURMA CÍVEL",
+        "6ª TURMA CÍVEL",
+        "7ª TURMA CÍVEL",
+        "8ª TURMA CÍVEL"
+      ]
+    },
+    {
+      "base": "TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "TURMA CÍVEL",
+        "Turma Civel"
+      ]
+    },
+    {
+      "base": "1ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "1ª TURMA CÍVEL",
+        "1ª Turma Civel"
+      ]
+    },
+    {
+      "base": "2ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "2ª TURMA CÍVEL",
+        "2ª Turma Civel"
+      ]
+    },
+    {
+      "base": "3ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "3ª TURMA CÍVEL",
+        "3ª Turma Civel"
+      ]
+    },
+    {
+      "base": "4ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "4ª TURMA CÍVEL",
+        "4ª Turma Civel"
+      ]
+    },
+    {
+      "base": "5ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "5ª TURMA CÍVEL",
+        "5ª Turma Civel"
+      ]
+    },
+    {
+      "base": "6ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "6ª TURMA CÍVEL",
+        "6ª Turma Civel"
+      ]
+    },
+    {
+      "base": "7ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "7ª TURMA CÍVEL",
+        "7ª Turma Civel"
+      ]
+    },
+    {
+      "base": "8ª TURMA CÍVEL",
+      "agregador": false,
+      "variantes": [
+        "8ª TURMA CÍVEL",
+        "8ª Turma Civel"
+      ]
+    }
+  ],
+  "relatores_com_total_acórdaos": {
+    "ADELITH CASTRO DE CARVALHO LOPES": 3080,
+    "ADEMAR SILVA DE VASCONCELOS": 1,
+    "AISTON HENRIQUE DE SOUSA": 31671,
+    "ALFEU MACHADO": 51943,
+    "ALMIR ANDRADE DE FREITAS": 9523,
+    "ALVARO CIARLINI": 32064,
+    "ALVARO LUIZ CHAN JORGE": 450,
+    "ANA CANTARINO": 31857,
+    "ANA CLAUDIA LOIOLA DE MORAIS MENDES": 1057,
+    "ANA MARIA AMARANTE": 24204,
+    "ANA MARIA FERREIRA DA SILVA": 14133,
+    "ANDRE GOMES ALVES": 322,
+    "ANGELO PASSARELI": 45298,
+    "ANTONINHO LOPES": 14513,
+    "ANTONIO FERNANDES DA LUZ": 14192,
+    "ANTONIO HONORIO": 2291,
+    "ARILSON RAMOS": 134,
+    "ARLINDO MARES": 1475,
+    "ARNALDO CORRÊA SILVA": 23466,
+    "ARNOLDO CAMANHO DE ASSIS": 75225,
+    "ARQUIBALDO CARNEIRO PORTELA": 24957,
+    "ASDRUBAL NASCIMENTO": 3428,
+    "ASIEL HENRIQUE DE SOUSA": 20862,
+    "BENITO TIEZZI": 1888,
+    "CAIO BRUCOLI SEMBONGI": 1,
+    "CAMILLE GONÇALVES JAVARINE FERREIRA": 3,
+    "CAMPOS AMARAL": 2673,
+    "CANDIDO COLOMBO": 535,
+    "CARLOS ALBERTO MARTINS FILHO": 25393,
+    "CARLOS AUGUSTO FARIA": 1731,
+    "CARLOS BISMARCK PISKE DE AZEVEDO BARBOSA": 128,
+    "CARLOS EDUARDO": 124,
+    "CARLOS PIRES SOARES NETO": 22332,
+    "CARLOS RODRIGUES": 16317,
+    "CARMELITA BRASIL": 32593,
+    "CARMEN BITTENCOURT": 16628,
+    "CARNEIRO DE ULHOA": 1381,
+    "CESAR LOYOLA": 21684,
+    "CRUZ MACEDO": 77821,
+    "DANIEL FELIPE MACHADO": 7567,
+    "DANTE GUERRERA": 1218,
+    "DARCY RIBEIRO": 260,
+    "DELEANE CAMARGO": 71,
+    "DEMETRIUS GOMES CAVALCANTI": 17545,
+    "DEOCLECIANO QUEIROGA": 1612,
+    "DIAULAS COSTA RIBEIRO": 28257,
+    "DIRCEU DE FARIA": 1600,
+    "DIVA LUCY DE FARIA PEREIRA": 21331,
+    "DONIZETI  APARECIDO": 661,
+    "DUARTE DE AZEVEDO": 1174,
+    "DÁCIO VIEIRA": 27505,
+    "EDI MARIA COUTINHO BIZZI": 12079,
+    "EDILSON ENEDINO DAS CHAGAS": 9490,
+    "EDITTE PATRÍCIO": 349,
+    "EDMAR RAMIRO CORREIA": 151,
+    "EDMUNDO MINERVINO": 7611,
+    "EDSON SMANIOTTO": 9186,
+    "EDUARDO HENRIQUE ROSAS": 5391,
+    "EDUARDO OLIVEIRA": 5812,
+    "EDUARDO RIBEIRO": 1495,
+    "ELMANO CAVALCANTI DE FARIAS": 1595,
+    "ESDRAS NEVES": 39055,
+    "ESTEVAM MAIA": 7882,
+    "EUSTÁQUIO DE CASTRO": 27543,
+    "EUTALIA MACIEL": 210,
+    "EVANDRO NEIVA DE AMORIM": 93,
+    "EVERARDS MOTA E MATOS": 2575,
+    "FABRÍCIO FONTOURA BEZERRA": 29869,
+    "FELIPE VIDIGAL DE ANDRADE SERRA": 10011,
+    "FERNANDO HABIBE": 49833,
+    "FERNANDO TAVERNARD": 27169,
+    "FIGUEIREDO BRANCO": 170,
+    "FLAVIO ROSTIROLA": 36509,
+    "FLÁVIO AUGUSTO MARTINS LEITE": 3671,
+    "FLÁVIO FERNANDO ALMEIDA DA FONSECA": 20672,
+    "FRANCISCO ANTONIO ALVES DE OLIVEIRA": 409,
+    "FÁBIO EDUARDO MARQUES": 27309,
+    "FÁTIMA RAFAEL": 37814,
+    "GABRIELA JARDON GUIMARAES DE FARIA": 2544,
+    "GEILZA FATIMA CAVALCANTI DINIZ": 507,
+    "GEORGE LOPES": 21466,
+    "GERALDO JOFFILY": 844,
+    "GETULIO PINHEIRO": 6452,
+    "GETÚLIO DE MORAES OLIVEIRA": 75362,
+    "GILBERTO PEREIRA DE OLIVEIRA": 25176,
+    "GILMAR DE JESUS GOMES DA SILVA": 9812,
+    "GILMAR TADEU SORIANO": 1824,
+    "GISELLE ROCHA RAPOSO": 12225,
+    "GISLENE PINHEIRO DE OLIVEIRA": 36993,
+    "GUIMARÃES SOUZA": 778,
+    "HAYDEVALDA SAMPAIO": 8276,
+    "HECTOR VALVERDE SANTANNA": 39091,
+    "HELLÁDIO MONTEIRO": 1071,
+    "HENRIQUE BRAUNE": 160,
+    "HERMENEGILDO GONÇALVES": 5930,
+    "HILÁRIO DE VASCONCELOS": 1498,
+    "HUGO AULER": 630,
+    "HUMBERTO EUSTAQUIO": 152,
+    "HUMBERTO ULHÔA": 23772,
+    "IRACEMA MIRANDA E SILVA": 1429,
+    "IRAJA PIMENTEL": 1369,
+    "IRAN DE LIMA": 796,
+    "ISABEL PINTO": 557,
+    "J.J. COSTA CARVALHO": 29660,
+    "JAIR SOARES": 43726,
+    "JAMES EDUARDO OLIVEIRA": 37162,
+    "JANSEN FIALHO DE ALMEIDA": 9148,
+    "JERONYMO DE SOUZA": 18286,
+    "JESUINO RISSATO": 19771,
+    "JOAQUIM SOUZA": 140,
+    "JOAZIL GARDES": 1828,
+    "JOSAPHÁ FRANCISCO DOS SANTOS": 25580,
+    "JOSE COLOMBO": 297,
+    "JOSE DILERMANDO": 844,
+    "JOSE FERNANDES": 1701,
+    "JOSE FIRMO REIS SOUB": 11500,
+    "JOSE JULIO": 918,
+    "JOSE RONALDO ROSSATO": 125,
+    "JOSÉ DE AQUINO": 1664,
+    "JOSÉ DIVINO": 31767,
+    "JOSÉ GUILHERME": 9479,
+    "JOÃO BATISTA GONÇALVES DA SILVA": 210,
+    "JOÃO BATISTA TEIXEIRA": 14196,
+    "JOÃO DA MATTA E SILVA": 19,
+    "JOÃO EGMONT": 49130,
+    "JOÃO LUÍS FISCHER DIAS": 21592,
+    "JOÃO MARIOSI": 27709,
+    "JOÃO TIMÓTEO DE OLIVEIRA": 22699,
+    "JULIO ROBERTO DOS REIS": 329,
+    "JUSCELINO RIBEIRO": 1983,
+    "JÚLIO DE OLIVEIRA": 1034,
+    "LEANDRO BORGES DE FIGUEIREDO": 2996,
+    "LECIR MANOEL DA LUZ": 16334,
+    "LEIA ESTEVES": 15,
+    "LEILA ARLANCH": 37497,
+    "LEILA CURY": 154,
+    "LEONARDO ROSCOE BESSA": 16249,
+    "LEONOR AGUENA": 8621,
+    "LIA FANUCK": 73,
+    "LILA DUARTE": 389,
+    "LIZANDRO GARCIA GOMES FILHO": 3715,
+    "LUCIANO MOREIRA VASCONCELLOS": 13648,
+    "LUCIMEIRE MARIA DA SILVA": 15662,
+    "LUIS EDUARDO YATSUDA ARIMA": 5181,
+    "LUIS MARTIUS HOLANDA BEZERRA JUNIOR": 1980,
+    "LUIZ CLAUDIO ABREU": 2541,
+    "LUIZ VICENTE CERNICCHIARO": 2007,
+    "LUÍS GUSTAVO B. DE OLIVEIRA": 35734,
+    "LÉCIO RESENDE": 28092,
+    "LÚCIO ARANTES": 3617,
+    "MANOEL COELHO": 2089,
+    "MARA SILDA NUNES DE ALMEIDA": 550,
+    "MARCELO TADEU DE ASSUNCAO SOBRINHO": 131,
+    "MARCIO RIBEIRO": 62,
+    "MARCO ANTONIO DO AMARAL": 7722,
+    "MARGARETH CRISTINA BECKER": 5488,
+    "MARIA APARECIDA FERNANDES": 3148,
+    "MARIA BEATRIZ PARRILHA": 3226,
+    "MARIA DE LOURDES ABREU": 36747,
+    "MARIA GRAZIELA BARBOSA DANTAS": 12053,
+    "MARIA ISABEL DE LOURDES SILVA": 5902,
+    "MARIA IVATÔNIA": 34422,
+    "MARIA THEREZA BRAGA": 1846,
+    "MARILIA DE AVILA E SILVA SAMPAIO": 13323,
+    "MARIO BRASIL": 427,
+    "MARIO HENRIQUE SILVEIRA DE ALMEIDA": 3182,
+    "MARIO MACHADO": 61365,
+    "MAURICIO SILVA MIRANDA": 10010,
+    "MAURO RENAN BITTENCOURT": 161,
+    "MELLO MARTINS": 1685,
+    "MILTON SEBASTIAO BARBOSA": 719,
+    "MÁRIO-ZAM BELMIRO": 50860,
+    "NANCY ANDRIGHI": 1989,
+    "NATANAEL CAETANO": 21275,
+    "NILSONI DE FREITAS CUSTODIO": 23195,
+    "NÍDIA CORRÊA LIMA": 34175,
+    "NÍVIO GONÇALVES": 19716,
+    "ORIANA PISKE": 194,
+    "OSWALDO SILVA": 477,
+    "OTÁVIO AUGUSTO": 32802,
+    "P. A. ROSA DE FARIAS": 3221,
+    "PAULO EVANDRO": 620,
+    "PAULO GARCIA": 1633,
+    "PAULO ROGÉRIO SANTOS GIORDANO": 107,
+    "PEDRO DE ARAUJO YUNG-TAY NETO": 681,
+    "PINGRET DE CARVALHO": 2180,
+    "RAFAEL RODRIGUES DE CASTRO SILVA": 8895,
+    "RAIMUNDO FERREIRA": 961,
+    "RENATO SCUSSEL": 13428,
+    "RIBEIRO DE SOUSA": 998,
+    "RITA DE CÁSSIA DE CERQUEIRA LIMA ROCHA": 7717,
+    "ROBERTO FREITAS FILHO": 25433,
+    "ROBERTO SANTOS": 367,
+    "ROBERVAL CASEMIRO BELINATI": 27892,
+    "ROBSON BARBOSA DE AZEVEDO": 25019,
+    "ROBSON TEIXEIRA DE FREITAS": 20178,
+    "ROMEU GONZAGA NEIVA": 79982,
+    "ROMEU JOBIM": 696,
+    "ROMILDO BUENO": 84,
+    "ROMULO DE ARAUJO MENDES": 44177,
+    "ROMÃO C. OLIVEIRA": 59910,
+    "SANDOVAL OLIVEIRA": 33512,
+    "SANDRA DE SANTIS": 19219,
+    "SANDRA REVES": 30439,
+    "SEBASTIÃO COELHO": 16330,
+    "SILVA LEMOS": 14290,
+    "SILVANA DA SILVA CHAVES": 8359,
+    "SILVANIO BARBOSA DOS SANTOS": 32198,
+    "SIMONE GARCIA PENA": 1,
+    "SIMONE LUCINDO": 34060,
+    "SONÍRIA ROCHA CAMPOS D'ASSUNÇÃO": 26351,
+    "SOUZA E AVILA": 8508,
+    "SÉRGIO BITTENCOURT": 12887,
+    "SÉRGIO ROCHA": 47468,
+    "TARCISIO DE MORAES SOUZA": 12318,
+    "TEÓFILO CAETANO": 46895,
+    "TÂNIA RORIZ": 62,
+    "VALTENIO MENDES": 2610,
+    "VALTER XAVIER": 3902,
+    "VASQUEZ CRUXÊN": 8538,
+    "VAZ DE MELLO": 4096,
+    "VERA ANDRIGHI": 54433,
+    "VILMAR JOSÉ BARRETO PINHEIRO": 53,
+    "VITOR FELTRIM BARBOSA": 92,
+    "WALDIR LEÔNCIO LOPES JÚNIOR": 115857,
+    "WALDIR MEUREN": 1918,
+    "WELLINGTON MEDEIROS": 2801,
+    "WILDE MARIA SILVA JUSTINIANO RIBEIRO": 4064
+  },
+  "apis_rh": {
+    "_meta": {
+      "base_url": "https://rest-rh.tjdft.jus.br/api/transparencia",
+      "metodo": "GET",
+      "autenticacao": "Nenhuma",
+      "formato": "JSON"
+    },
+    "endpoints": {
+      "teletrabalho": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/teletrabalho",
+        "descricao": "Servidores em regime de teletrabalho (situação atual)",
+        "parametros": "nenhum",
+        "resposta_campos": [
+          "Nome"
+        ]
+      },
+      "estagiarios": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/estagiarios",
+        "descricao": "Estagiários vinculados ao TJDFT (situação atual)",
+        "parametros": "nenhum",
+        "resposta_campos": [
+          "Nome"
+        ]
+      },
+      "cedidos_tjdft_para_outros": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/cedidos/1/{mes}/{ano}",
+        "descricao": "Servidores cedidos do TJDFT a outros órgãos",
+        "parametros": {
+          "mes": "int 1-12",
+          "ano": "int ex: 2025"
+        },
+        "resposta_campos": [
+          "Matr",
+          "Nome",
+          "DtInicioCessao",
+          "DtRetornoCessao",
+          "FCCJ",
+          "Sigla",
+          "RazaoSocial"
+        ]
+      },
+      "cedidos_outros_para_tjdft": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/cedidos/2/{mes}/{ano}",
+        "descricao": "Servidores de outros órgãos cedidos ao TJDFT",
+        "parametros": {
+          "mes": "int 1-12",
+          "ano": "int ex: 2025"
+        },
+        "resposta_campos": [
+          "Matr",
+          "Nome",
+          "DtInicioCessao",
+          "DtRetornoCessao",
+          "FCCJ",
+          "Sigla",
+          "RazaoSocial"
+        ]
+      },
+      "anistiados": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/cedidos/3/{mes}/{ano}",
+        "descricao": "Servidores anistiados de outros órgãos em exercício no TJDFT",
+        "parametros": {
+          "mes": "int 1-12",
+          "ano": "int ex: 2025"
+        },
+        "resposta_campos": [
+          "Matr",
+          "Nome",
+          "DtInicioCessao",
+          "DtRetornoCessao",
+          "FCCJ",
+          "Sigla",
+          "RazaoSocial"
+        ]
+      },
+      "servidores_nao_integrantes": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/servidoresNaoIntegrantes",
+        "descricao": "Servidores em exercício no TJDFT sem vínculo efetivo",
+        "parametros": "nenhum",
+        "resposta_campos": [
+          "Nome",
+          "CargoOrgaoOrigem",
+          "RazaoSocial",
+          "Poder",
+          "Regime",
+          "Lotacao",
+          "NuOficioInicialProcedimento",
+          "DtInicioCessaoJul"
+        ]
+      },
+      "tlp1_judiciarias": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/tlp/1/{mes}/{ano}",
+        "descricao": "Tabela de Lotação — Unidades Judiciárias 1º e 2º Graus",
+        "parametros": {
+          "mes": "int 1-12",
+          "ano": "int"
+        },
+        "resposta_campos": [
+          "TLP",
+          "DataReferencia",
+          "Grau",
+          "Tipo",
+          "CdLocalizacao",
+          "DescricaoCompleta",
+          "LotacaoParadigma",
+          "LR_Efet",
+          "LR_I",
+          "LR_SV",
+          "QtdCJ01",
+          "QtdCJ02",
+          "QtdCJ03",
+          "QtdCJ04",
+          "QtdFC01",
+          "QtdFC02",
+          "QtdFC03",
+          "QtdFC04",
+          "QtdFC05"
+        ]
+      },
+      "tlp2_apoio_direto": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/tlp/2/{mes}/{ano}",
+        "descricao": "Tabela de Lotação — Unidades de Apoio Direto à Atividade Judicante",
+        "parametros": {
+          "mes": "int 1-12",
+          "ano": "int"
+        },
+        "resposta_campos": "mesmo que tlp1"
+      },
+      "tlp3_apoio_indireto": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/tlp/3/{mes}/{ano}",
+        "descricao": "Tabela de Lotação — Unidades de Apoio Indireto (Corregedoria, Secretarias etc.)",
+        "parametros": {
+          "mes": "int 1-12",
+          "ano": "int"
+        },
+        "resposta_campos": "mesmo que tlp1"
+      },
+      "matriz_cargos": {
+        "url": "https://rest-rh.tjdft.jus.br/api/transparencia/matrizCargos",
+        "descricao": "Matriz de Cargos Efetivos — mapeamento cargo x localização",
+        "parametros_opcionais": {
+          "cargo": "código ex: ANA022",
+          "localizacao": "código ex: 11201100000"
+        },
+        "resposta_campos": [
+          "Localizacao",
+          "SgLocalizacao",
+          "unidade",
+          "grupamentoCNJ",
+          "codCargo",
+          "desCargo",
+          "area",
+          "especialidade",
+          "Finalistico"
+        ]
+      }
+    }
+  }
+}

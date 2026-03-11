@@ -1,0 +1,294 @@
+# TJDFT API — LLM Context File
+
+**Project:** FastAPI service for querying TJDFT (Tribunal de Justiça do Distrito Federal)
+jurisprudence. Structured REST interface with caching, pagination, filter validation,
+data enrichment, and E2E tests.
+
+**Stack:** Python 3.11+, FastAPI 0.135+, SQLAlchemy 2.0, Pydantic v2, httpx,
+Redis (falls back to in-memory), pytest, testcontainers.
+
+**Document hierarchy:**
+- This file — Entry point for LLM agents (API reference + gotchas)
+- `CLAUDE.md` — Python development guide (project structure, commands, patterns)
+- `docs/tjdft_api.md` — Detailed endpoint reference with all record fields
+- `docs/tjdft_apis_completo.md` — All TJDFT public APIs (jurisprudência + RH)
+- `docs/tjdft_api_dictionary.json` — Machine-readable: 228 relatores, 125 classes, 33 órgãos
+- `docs/e2e-test-plan.md` — E2E testing strategy and documentation
+
+---
+
+## Project Structure
+
+```
+app/
+├── main.py                      # FastAPI application, CORS, router includes
+├── config.py                    # Settings (pydantic-settings), get_settings()
+├── database.py                  # SQLAlchemy async engine, session factory
+├── api/v1/endpoints/
+│   └── busca.py                 # POST /api/v1/busca/ - search endpoint with enrichment
+├── models/
+│   ├── consulta.py              # Consulta model (search history)
+│   └── decisao.py               # Decisao model (decision cache)
+├── repositories/                # Data access layer
+│   ├── consulta_repo.py         # ConsultaRepository
+│   └── decisao_repo.py          # DecisaoRepository
+├── schemas/                     # Pydantic v2 request/response models
+│   ├── consulta.py              # BuscaRequest, BuscaResponseEnriquecida
+│   ├── decisao.py               # DecisaoResponse, DecisaoEnriquecida
+│   └── analise.py               # Analysis schemas
+├── services/
+│   ├── tjdft_client.py          # TJDFTClient — HTTP layer (0-indexed pagination)
+│   ├── busca_service.py         # BuscaService — business logic, enrichment
+│   ├── ai_service.py            # AIService — OpenAI integration (summarization)
+│   └── estatisticas_service.py  # EstatisticasService — analytics, trends
+├── utils/
+│   ├── cache.py                 # CacheManager (Redis + fallback in-memory, redis_url support)
+│   ├── enrichment.py            # calcular_densidade, calcular_instancia
+│   └── filtros.py               # Filter validation, load_referencia(), filtrar_por_instancia
+├── __init__.py                  # Exports: Consulta, Decisao, repositories
+tests/
+├── conftest.py                  # Fixtures for unit/integration tests
+├── e2e/                         # End-to-end tests (27 tests, requires Docker)
+│   ├── conftest.py              # Docker fixtures (PostgreSQL, Redis)
+│   ├── fixtures/tjdft_api.py    # Rate-limited API fixture
+│   ├── test_busca_e2e.py       # 9 busca endpoint tests
+│   ├── test_cache_e2e.py       # 10 Redis integration tests
+│   └── test_database_e2e.py    # 8 PostgreSQL persistence tests
+├── test_api/                    # API contract tests
+├── test_services/               # Service layer tests
+├── test_repositories/           # Repository tests
+└── test_utils/                  # Utility tests
+docs/
+├── e2e-test-plan.md             # E2E testing documentation
+├── testing-backend-strategy.md  # SQLite in-memory for tests
+├── testing-taxonomy.md          # Test classification (unit/integration/api/e2e)
+├── tjdft_api.md                 # Endpoint reference
+├── tjdft_apis_completo.md       # All TJDFT APIs (jurisprudência + RH)
+└── tjdft_api_dictionary.json    # Machine-readable filter values
+```
+
+---
+
+## API Endpoints
+
+### GET `/`
+Root endpoint with API info.
+
+### GET `/health`
+Health check endpoint.
+
+### POST `/api/v1/busca/`
+Search decisions with enrichment features.
+
+**Request body:**
+```json
+{
+  "query": "texto de busca",
+  "pagina": 0,
+  "tamanho": 20,
+  "filtros": {
+    "relator": "NOME RELATOR",
+    "classe": "APELAÇÃO CÍVEL",
+    "orgao_julgador": "1ª TURMA CÍVEL"
+  },
+  "excluir_turmas_recursais": false,
+  "apenas_ativos": false
+}
+```
+
+**Query parameters:**
+- `excluir_turmas_recursais` - Remove Juizados Especiais results
+- `apenas_ativos` - Filter only active relatores
+
+**Response enrichment:**
+- `densidade_precedentes` - escasso/moderado/consolidado/massivo
+- `instancia` - juizado_especial/tjdft_2a_instancia
+- `resumo_relevancia` - Relevance markers
+
+---
+
+## TJDFT External API
+
+**Base URL:** `https://jurisdf.tjdft.jus.br/api/v1/pesquisa`
+
+### GET /pesquisa — Metadata
+Returns valid filter values: `relatores` (228), `revisores` (63), `classes` (125), `orgaos` (33 groups).
+
+### POST /pesquisa — Search
+```json
+{
+  "query": "texto",
+  "pagina": 0,
+  "tamanho": 20,
+  "termosAcessorios": [
+    {"campo": "nomeRelator", "valor": "NOME EXATO"},
+    {"campo": "descricaoClasseCnj", "valor": "APELAÇÃO CÍVEL"},
+    {"campo": "descricaoOrgaoJulgador", "valor": "1ª TURMA CÍVEL"},
+    {"campo": "base", "valor": "acordaos"},
+    {"campo": "processo", "valor": "0702180-36.2024.8.07.0001"}
+  ]
+}
+```
+
+**Valid `campo` values:** `nomeRelator`, `nomeRevisor`, `nomeRelatorDesignado`,
+`descricaoClasseCnj`, `descricaoOrgaoJulgador`, `base`, `subbase`, `processo`,
+`uuid`, `identificador`.
+
+**Subbases:** `acordaos` (~444k), `acordaos-tr` (~73k), `decisoes-monocraticas` (~309k).
+
+**Pagination:** 0-indexed, max 40 per page.
+
+---
+
+## Critical Gotchas
+
+1. **`nomeRelator` must be exact.** Use `GET /pesquisa` → `relatores` (228 names).
+   The old `data/referencia.json` (17 entries) is GONE.
+
+2. **Date filters are broken.** `dataJulgamento`/`dataPublicacao` as `termosAcessorios`
+   cause HTTP 500. Do not use.
+
+3. **Pagination is consistently 0-indexed.** Fixed in current version - both `TJDFTClient`
+   and `BuscaService` use 0-indexed pagination.
+
+4. **Max 40 results per page.** `tamanho > 40` returns HTTP 400.
+
+5. **`query=""` (empty string) is valid** - returns all documents matching other filters.
+
+6. **Rejected campo names (400):** `revisor`, `relatorDesignado`, `segredoJustica`, `q`,
+   `ordenacao`, `direcao`. Use `nomeRevisor`/`nomeRelatorDesignado` instead.
+
+7. **`decisoes-monocraticas` has different structure.** Missing: `dataJulgamento`,
+   `decisao`, `localDePublicacao`, `relatorAtivo`, `turmaRecursal`. Has `inteiroTeor`
+   (string) not `inteiroTeorHtml`, plus `jurisprudenciaEmFoco` array.
+
+8. **No sorting support.** TJDFT API does not support custom sort order.
+
+9. **Aggregations are query-scoped.** Reflect full result set of current query+filters,
+   not just current page.
+
+10. **Órgãos have name variants.** Same court appears as "1 TURMA CÍVEL", "1ª TURMA CÍVEL",
+    "1 Turma Civel". Normalize against `docs/tjdft_api_dictionary.json`.
+
+11. **Docker required for E2E tests only.** API runs without Docker - only tests use it
+    via testcontainers for PostgreSQL/Redis containers.
+
+---
+
+## Services & Repositories
+
+### TJDFTClient (`app/services/tjdft_client.py`)
+- Async HTTP client for TJDFT API
+- Methods: `buscar_simples()`, `buscar_com_filtros()`, `buscar_todas_paginas()`, `get_metadata()`
+- Caching with TTL, retry with exponential backoff
+- Exceptions: `TJDFTClientError`, `TJDFTConnectionError`, `TJDFTTimeoutError`, `TJDFTAPIError`
+
+### BuscaService (`app/services/busca_service.py`)
+- Orchestrates search, validation, enrichment, persistence
+- Methods: `buscar()`, `buscar_com_filtro_avancado()`, `buscar_todas_paginas()`,
+  `buscar_similares()`, `historico_consultas()`
+- Uses `ConsultaRepository` and `DecisaoRepository`
+
+### AIService (`app/services/ai_service.py`)
+- OpenAI integration for decision analysis
+- Methods: `resumir_ementa()`, `extrair_teses()`, `comparar_decisoes()`, `explicar_conceito()`
+- Disabled when `OPENAI_API_KEY` not set
+
+### EstatisticasService (`app/services/estatisticas_service.py`)
+- Analytics and trend analysis
+- Methods: `analise_por_relator()`, `analise_temporal()`, `calcular_tendencia()`,
+  `rankings`, `comparar_periodos()`
+
+---
+
+## Error Handling
+
+| TJDFT response | Cause | Our response |
+|---|---|---|
+| HTTP 400 | Rejected campo / `tamanho > 40` | `422` with rejected campos list |
+| HTTP 500 | Date filter used | `502` — "date filters not supported" |
+| Timeout / connection | TJDFT unreachable | Retry once; second failure: `503` |
+| Invalid `nomeRelator` | Not in metadata | `422` with fuzzy suggestions |
+
+---
+
+## Testing
+
+**148 tests, 88% coverage**
+
+```bash
+# Unit/integration tests (no Docker required)
+pytest tests/ -v
+
+# E2E tests (requires Docker)
+pytest tests/e2e/ -v
+
+# By marker
+pytest -m unit          # Fast, isolated tests
+pytest -m integration   # Database/multi-layer tests
+pytest -m api           # HTTP contract tests
+pytest -m e2e           # End-to-end (Docker)
+```
+
+**E2E test fixtures:**
+- `postgres_container` - PostgreSQL via testcontainers
+- `redis_container` - Redis via testcontainers
+- `e2e_cache_manager` - Real Redis client
+- `e2e_session` - Real PostgreSQL session
+- `rate_limited_request` - Rate-limited TJDFT API calls
+
+---
+
+## Dependencies
+
+**Production:**
+- fastapi>=0.109.0, uvicorn[standard]>=0.27.0
+- pydantic>=2.5.0, pydantic-settings>=2.1.0
+- sqlalchemy>=2.0.0, alembic>=1.18.4
+- aiosqlite>=0.22.1 (dev), asyncpg>=0.31.0 (prod)
+- httpx>=0.28.1, openai>=1.12.0
+- redis>=5.0.0 (E2E tests)
+
+**Removed (unused):**
+- python-jose[cryptography] - JWT handling (not used)
+- passlib[bcrypt] - Password hashing (not used)
+
+**Dev:**
+- pytest, pytest-asyncio, pytest-cov, pytest-timeout
+- testcontainers>=4.7.0
+- black, isort, flake8, mypy
+
+---
+
+## Not Yet Implemented
+
+- **RH APIs** — teletrabalho, estagiarios, cedidos, TLP, matrizCargos
+  (documented in `docs/tjdft_apis_completo.md`)
+- **Analytics router** — stats endpoints (service exists, no HTTP routes)
+- **AI endpoints** — summarization/analysis endpoints (service exists, no HTTP routes)
+
+---
+
+## Git Branch Naming Convention
+
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `feature/` | New features | `feature/add-export-pdf` |
+| `fix/` | Bug fixes | `fix/async-sqlite-date-validation` |
+| `docs/` | Documentation | `docs/update-readme-api-examples` |
+| `refactor/` | Code refactoring | `refactor/extract-cache-service` |
+| `test/` | Tests | `test/add-busca-integration-tests` |
+| `chore/` | Maintenance (deps, configs) | `chore/update-dependencies` |
+| `hotfix/` | Urgent production fixes | `hotfix/fix-auth-bypass` |
+
+**Format:** `{type}/{short-description-in-kebab-case}`
+
+---
+
+## References
+
+- `CLAUDE.md` — Dev setup, structure, commit checklist
+- `docs/tjdft_api.md` — Full endpoint reference
+- `docs/tjdft_apis_completo.md` — All TJDFT public APIs
+- `docs/tjdft_api_dictionary.json` — Filter values reference
+- `docs/e2e-test-plan.md` — E2E testing strategy

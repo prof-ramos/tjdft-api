@@ -1,9 +1,11 @@
 from typing import AsyncGenerator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
+from app.core.sqlite_config import configure_sqlite, run_optimize
 
 settings = get_settings()
 
@@ -13,6 +15,20 @@ engine = create_async_engine(
     echo=settings.debug,
     future=True,
 )
+
+
+# Configure SQLite optimizations on new connections
+@event.listens_for(engine.sync_engine, "connect")
+def on_connect(dbapi_conn, connection_record):
+    """Apply SQLite configuration pragmas on new connections."""
+    # Create a minimal connection wrapper for the configure function
+    class _SimpleConnection:
+        def __init__(self, dialect, connection):
+            self.dialect = dialect
+            self.connection = connection
+
+    wrapper = _SimpleConnection(engine.dialect, dbapi_conn)
+    configure_sqlite(wrapper)
 
 # Create async session factory
 async_session_maker = async_sessionmaker(
@@ -66,5 +82,8 @@ async def init_db() -> None:
 
 
 async def close_db() -> None:
-    """Close database connection."""
+    """Close database connection and run optimization."""
+    # Run PRAGMA optimize before closing to update query planner stats
+    async with engine.connect() as conn:
+        await conn.run_sync(run_optimize)
     await engine.dispose()

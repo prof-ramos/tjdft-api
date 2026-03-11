@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 class ResumoRequest(BaseModel):
     """Request schema for generating decision summaries."""
 
-    ementa: str = Field(..., min_length=1, description="Decision ementa text to summarize")
+    ementa: str = Field(
+        ..., min_length=1, description="Decision ementa text to summarize"
+    )
 
     model_config = {"from_attributes": True}
 
@@ -54,7 +56,9 @@ class CompararResponse(BaseModel):
 class ExplicarRequest(BaseModel):
     """Request schema for explaining legal concepts."""
 
-    termo: str = Field(..., min_length=1, description="Legal term or concept to explain")
+    termo: str = Field(
+        ..., min_length=1, description="Legal term or concept to explain"
+    )
     contexto: str = Field(
         default="",
         description="Optional context for better explanation",
@@ -68,9 +72,7 @@ class ExplicarResponse(BaseModel):
 
     termo: str = Field(..., description="The term that was explained")
     explicacao: str = Field(..., description="Explanation of the term")
-    exemplos: List[str] = Field(
-        default_factory=list, description="Practical examples"
-    )
+    exemplos: List[str] = Field(default_factory=list, description="Practical examples")
     termos_relacionados: List[str] = Field(
         default_factory=list, description="Related legal terms"
     )
