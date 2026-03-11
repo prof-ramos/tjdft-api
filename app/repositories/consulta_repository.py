@@ -48,7 +48,9 @@ class ConsultaRepository(BaseRepository[Consulta]):
         """Busca consulta por ID."""
         return await self.get(id)
 
-    async def get_by_query(self, query: str, skip: int = 0, limit: int = 50) -> List[Consulta]:
+    async def get_by_query(
+        self, query: str, skip: int = 0, limit: int = 50
+    ) -> List[Consulta]:
         """Busca consultas pelo texto da query"""
         result = await self.session.execute(
             select(Consulta)
@@ -62,9 +64,7 @@ class ConsultaRepository(BaseRepository[Consulta]):
     async def get_recent(self, limit: int = 10) -> List[Consulta]:
         """Retorna consultas mais recentes"""
         result = await self.session.execute(
-            select(Consulta)
-            .order_by(desc(Consulta.criado_em))
-            .limit(limit)
+            select(Consulta).order_by(desc(Consulta.criado_em)).limit(limit)
         )
         return list(result.scalars().all())
 
@@ -82,11 +82,16 @@ class ConsultaRepository(BaseRepository[Consulta]):
         conditions = []
         if usuario_id:
             conditions.append(Consulta.usuario_id == str(usuario_id))
-        
+
         if data_inicio:
-            conditions.append(Consulta.criado_em >= datetime.combine(data_inicio, time.min))
+            conditions.append(
+                Consulta.criado_em >= datetime.combine(data_inicio, time.min)
+            )
         if data_fim:
-            conditions.append(Consulta.criado_em < datetime.combine(data_fim + timedelta(days=1), time.min))
+            conditions.append(
+                Consulta.criado_em
+                < datetime.combine(data_fim + timedelta(days=1), time.min)
+            )
 
         if conditions:
             stmt = stmt.where(and_(*conditions))

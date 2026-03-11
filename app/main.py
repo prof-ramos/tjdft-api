@@ -28,6 +28,7 @@ app.add_middleware(
 # Incluir routers da API
 app.include_router(api_v1_router, prefix="/api")
 
+
 @app.get("/", tags=["Root"])
 async def root():
     """API root endpoint"""

@@ -4,6 +4,7 @@ from sqlalchemy import select
 
 ModelType = TypeVar("ModelType")
 
+
 class BaseRepository(Generic[ModelType]):
     def __init__(self, session: AsyncSession, model: type[ModelType]):
         self.session = session

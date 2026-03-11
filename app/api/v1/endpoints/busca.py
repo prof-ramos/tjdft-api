@@ -6,7 +6,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.schemas.consulta import BuscaRequest, BuscaResponseEnriquecida, ConsultaResponse
+from app.schemas.consulta import (
+    BuscaRequest,
+    BuscaResponseEnriquecida,
+    ConsultaResponse,
+)
 from app.services.busca_service import BuscaService
 from app.utils.cache import get_cache
 
@@ -97,8 +101,7 @@ async def busca_com_filtros(
 
 @router.get("/historico", response_model=List[ConsultaResponse])
 async def historico_consultas(
-    limite: int = Query(10, ge=1, le=50),
-    session: AsyncSession = Depends(get_session)
+    limite: int = Query(10, ge=1, le=50), session: AsyncSession = Depends(get_session)
 ) -> List[Any]:
     """Retorna histórico das últimas consultas"""
     cache = get_cache()

@@ -26,7 +26,6 @@ from pydantic import BaseModel
 
 from app.utils.cache import CacheManager
 
-
 # ==========================================
 # Structured Logging Configuration
 # ==========================================
@@ -55,8 +54,10 @@ class StructuredFormatter(logging.Formatter):
 # Response Models with Pydantic Validation
 # ==========================================
 
+
 class TJDFTItem(BaseModel):
     """Schema de item retornado pelo TJDFT."""
+
     id: Optional[str] = None
     numero_processo: Optional[str] = None
     ementa: Optional[str] = None
@@ -68,6 +69,7 @@ class TJDFTItem(BaseModel):
 
 class TJDFTSearchResult(BaseModel):
     """Schema de resposta de busca."""
+
     total: int = 0
     itens: List[TJDFTItem] = []
     pagina: int = 0
@@ -78,9 +80,11 @@ class TJDFTSearchResult(BaseModel):
 # Graceful Fallback Response
 # ==========================================
 
+
 @dataclass
 class TJDFTResponse:
     """Resposta padrão com fallback graceful."""
+
     success: bool
     data: Optional[dict] = None
     error: Optional[str] = None
@@ -91,6 +95,7 @@ class TJDFTResponse:
 # ==========================================
 # Rate Limiter com Token Bucket
 # ==========================================
+
 
 class RateLimiter:
     """Rate limiter com token bucket."""
@@ -135,29 +140,35 @@ class RateLimiter:
 # Custom Exceptions
 # ==========================================
 
+
 class TJDFTClientError(Exception):
     """Base exception for TJDFT client errors."""
+
     pass
 
 
 class TJDFTConnectionError(TJDFTClientError):
     """Connection error exception."""
+
     pass
 
 
 class TJDFTTimeoutError(TJDFTClientError):
     """Timeout error exception."""
+
     pass
 
 
 class TJDFTAPIError(TJDFTClientError):
     """API error exception."""
+
     pass
 
 
 # ==========================================
 # Main TJDFT Client
 # ==========================================
+
 
 class TJDFTClient:
     """
@@ -209,21 +220,20 @@ class TJDFTClient:
 
         logger.info(
             "TJDFTClient initialized",
-            extra={"extra_data": {
-                "timeout": timeout,
-                "max_retries": max_retries,
-                "retry_delay": retry_delay,
-                "rate_limit": rate_limit,
-            }}
+            extra={
+                "extra_data": {
+                    "timeout": timeout,
+                    "max_retries": max_retries,
+                    "retry_delay": retry_delay,
+                    "rate_limit": rate_limit,
+                }
+            },
         )
 
     async def __aenter__(self):
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(self.timeout, connect=self.CONNECT_TIMEOUT),
-            limits=httpx.Limits(
-                max_keepalive_connections=5,
-                max_connections=10
-            ),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             follow_redirects=True,
             headers={
                 "User-Agent": "TJDFT-API/1.0",
@@ -257,7 +267,9 @@ class TJDFTClient:
             Dict ou TJDFTResponse com resultados.
         """
         if not isinstance(query, str):
-            return TJDFTResponse(success=False, error="Query must be a string", fallback=True)
+            return TJDFTResponse(
+                success=False, error="Query must be a string", fallback=True
+            )
 
         tamanho = min(tamanho, self.MAX_TAMANHO)
         payload = {"query": query, "pagina": pagina, "tamanho": tamanho}
@@ -276,7 +288,11 @@ class TJDFTClient:
 
                 # Validate response
                 if not self._validate_response(result):
-                    return TJDFTResponse(success=False, error="Invalid API response format", fallback=True)
+                    return TJDFTResponse(
+                        success=False,
+                        error="Invalid API response format",
+                        fallback=True,
+                    )
 
                 self.cache.set(cache_key, result, ttl=3600)
                 return TJDFTResponse(success=True, data=result)
@@ -286,7 +302,9 @@ class TJDFTClient:
             return TJDFTResponse(success=False, error=str(e), fallback=True)
         except Exception as e:
             logger.exception(f"Unexpected error in buscar_simples: {e}")
-            return TJDFTResponse(success=False, error=f"Internal error: {str(e)}", fallback=True)
+            return TJDFTResponse(
+                success=False, error=f"Internal error: {str(e)}", fallback=True
+            )
 
     async def buscar_com_filtros(
         self,
@@ -340,7 +358,9 @@ class TJDFTClient:
                 result = self._normalize_response(data, pagina, tamanho)
 
                 if not self._validate_response(result):
-                    return TJDFTResponse(success=False, error="Invalid response format", fallback=True)
+                    return TJDFTResponse(
+                        success=False, error="Invalid response format", fallback=True
+                    )
 
                 self.cache.set(cache_key, result, ttl=3600)
                 return TJDFTResponse(success=True, data=result)
@@ -368,7 +388,7 @@ class TJDFTClient:
             )
 
             if not response.success:
-                if all_registros: # Return partial if we have something
+                if all_registros:  # Return partial if we have something
                     return all_registros
                 return response
 
@@ -392,7 +412,11 @@ class TJDFTClient:
         try:
             cached = self.cache.get(cache_key)
             if cached:
-                return TJDFTResponse(success=True, data=json.loads(cached) if isinstance(cached, str) else cached, cached=True)
+                return TJDFTResponse(
+                    success=True,
+                    data=json.loads(cached) if isinstance(cached, str) else cached,
+                    cached=True,
+                )
 
             if not self.client:
                 raise RuntimeError("Client not initialized")
@@ -417,7 +441,9 @@ class TJDFTClient:
         """Realiza POST com retry automático."""
         return await self._request_with_retry("POST", self.BASE_URL, json=payload)
 
-    async def _request_with_retry(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
+    async def _request_with_retry(
+        self, method: str, url: str, **kwargs
+    ) -> Dict[str, Any]:
         """Request com retry e backoff exponencial."""
         if not self.client:
             raise RuntimeError("Client not initialized")
@@ -429,24 +455,34 @@ class TJDFTClient:
                 response.raise_for_status()
                 return cast(Dict[str, Any], response.json())
 
-            except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
+            except (
+                httpx.ConnectError,
+                httpx.TimeoutException,
+                httpx.NetworkError,
+            ) as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2 ** attempt)
+                    delay = self.retry_delay * (2**attempt)
                     await asyncio.sleep(delay)
                     continue
                 if isinstance(e, httpx.TimeoutException):
-                    raise TJDFTTimeoutError(f"Timeout after {self.max_retries} attempts")
+                    raise TJDFTTimeoutError(
+                        f"Timeout after {self.max_retries} attempts"
+                    )
                 raise TJDFTConnectionError(f"Connection failed: {e}")
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code >= 500 and attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2 ** attempt)
+                    delay = self.retry_delay * (2**attempt)
                     await asyncio.sleep(delay)
                     continue
-                raise TJDFTAPIError(f"API Error {e.response.status_code}: {e.response.text}")
+                raise TJDFTAPIError(
+                    f"API Error {e.response.status_code}: {e.response.text}"
+                )
 
-        raise TJDFTClientError(f"Failed after {self.max_retries} retries: {last_exception}")
+        raise TJDFTClientError(
+            f"Failed after {self.max_retries} retries: {last_exception}"
+        )
 
     def _validate_response(self, data: dict) -> bool:
         """Valida se resposta está no formato esperado (opcional para simplicidade interna)."""
