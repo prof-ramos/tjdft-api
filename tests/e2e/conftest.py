@@ -11,9 +11,8 @@ Environment Variables:
 """
 
 import logging
-from collections.abc import AsyncGenerator
-
 import os
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio

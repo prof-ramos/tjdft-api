@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<evaluation>
+  <name>TJDFT MCP Evaluation Suite</name>
+  <description>Conjunto de casos de teste estruturais e determinísticos para validar o servidor MCP do TJDFT.</description>
+
+  <test_case id="1">
+    <tool>tjdft_search_decisions</tool>
+    <params>
+      <query>ICMS mercadoria</query>
+      <page>1</page>
+      <page_size>5</page_size>
+    </params>
+    <expectation>ResponseEnvelope contendo 'items' (lista), 'total' (int >= 0) e 'metadata'. Itens devem conter termos relacionados a ICMS ou tributação.</expectation>
+  </test_case>
+
+  <test_case id="2">
+    <tool>tjdft_get_metadata</tool>
+    <params/>
+    <expectation>Objeto contendo as chaves 'relatores', 'classes' e 'orgaos', todos como listas de objetos com campos 'id' (UUID/str) e 'nome' (str).</expectation>
+  </test_case>
+
+  <test_case id="3">
+    <tool>tjdft_search_all_pages</tool>
+    <params>
+      <query>habeas corpus</query>
+      <max_pages>2</max_pages>
+    </params>
+    <expectation>Agregação estruturada de resultados de múltiplas páginas; deve retornar 'items' e 'total_aggregated'.</expectation>
+  </test_case>
+
+  <test_case id="4">
+    <tool>tjdft_list_history</tool>
+    <params>
+      <limit>10</limit>
+    </params>
+    <expectation>Lista de no máximo 10 objetos com campos 'id', 'timestamp' (ISO-8601), 'action' e 'user'. Ordenação cronológica reversa esperada.</expectation>
+  </test_case>
+
+  <test_case id="5">
+    <tool>tjdft_ai_summarize</tool>
+    <params>
+      <ementa>APELAÇÃO CÍVEL. PROCESSO CIVIL. CONSUMIDOR. CONTRATO DE SEGURO. SINISTRO. NEGATIVA DE COBERTURA. DANO MORAL CONFIGURADO.</ementa>
+    </params>
+    <expectation>Gera resumo analítico (Markdown ou JSON) contendo estrutura de 'resumo' e 'pontos_chave'. Deve mencionar 'seguro' e 'dano moral'.</expectation>
+  </test_case>
+
+  <test_case id="6">
+    <tool>tjdft_ai_extract_theses</tool>
+    <params>
+      <ementa>DIREITO CONSTITUCIONAL. RECURSO EXTRAORDINÁRIO. REPERCUSSÃO GERAL. LIBERDADE DE EXPRESSÃO VS PRIVACIDADE.</ementa>
+    </params>
+    <expectation>Identifica teses jurídicas; deve conter menção a 'liberdade de expressão' ou 'privacidade' no campo de tese ou contexto.</expectation>
+  </test_case>
+
+  <test_case id="7">
+    <tool>tjdft_ai_compare_decisions</tool>
+    <params>
+      <ementas>
+        <item>Ementa 1: Condenação por danos morais em atraso de voo.</item>
+        <item>Ementa 2: Improcedência de danos morais por atraso de voo de 2 horas.</item>
+      </ementas>
+    </params>
+    <expectation>Análise comparativa estruturada com campos 'similaridades', 'diferencas' e 'posicao_majoritaria'.</expectation>
+  </test_case>
+
+  <test_case id="8">
+    <tool>tjdft_search_decisions</tool>
+    <params>
+      <query>invalid_query_for_test_that_should_not_exist</query>
+      <filters>
+        <relator>Relator Inexistente</relator>
+      </filters>
+    </params>
+    <expectation>Retorna estrutura de resposta válida (ResponseEnvelope) com 'items' vazio e 'total' igual a 0.</expectation>
+  </test_case>
+
+  <test_case id="9">
+    <tool>tjdft_find_similar_decisions</tool>
+    <params>
+      <uuid_tjdft>83740000-0000-0000-0000-000000000001</uuid_tjdft>
+      <limit>3</limit>
+    </params>
+    <expectation>Sucesso: Caso o UUID exista no cache/banco, retorna lista de até 3 itens similares (idêntica estrutura de ResponseEnvelope).</expectation>
+  </test_case>
+
+  <test_case id="10">
+    <tool>tjdft_find_similar_decisions</tool>
+    <params>
+      <uuid_tjdft>00000000-0000-0000-0000-000000000001</uuid_tjdft>
+      <limit>3</limit>
+    </params>
+    <expectation>Erro: Retorna erro 404 (Not Found) ou mensagem amigável de 'id não encontrado'.</expectation>
+  </test_case>
+
+  <test_case id="11">
+    <tool>tjdft_get_consulta</tool>
+    <params>
+      <consulta_id>00000000-0000-0000-0000-000000000000</consulta_id>
+    </params>
+    <expectation>Retorna erro controlado ou nulo para consulta inexistente, respeitando o schema ObjectResponseEnvelope.</expectation>
+  </test_case>
+</evaluation>

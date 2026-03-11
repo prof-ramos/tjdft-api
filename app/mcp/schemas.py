@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -253,4 +253,45 @@ class ObjectResponseEnvelope(MCPBaseModel, Generic[ResponseItemT]):
     truncated: TruncationInfo | None = Field(
         default=None,
         description="Metadados de truncamento aplicado à renderização",
+    )
+
+
+class AIContextMixin(MCPBaseModel):
+    """Mixin para ferramentas de IA que aceitam contexto adicional."""
+
+    contexto: str | None = Field(
+        default=None,
+        description="Contexto extra (fatos do caso, petição, etc.) para orientar a IA",
+    )
+
+
+class SummarizeEmentaToolInput(ResponseFormatMixin, AIContextMixin):
+    """Entrada para a tool de resumo de ementa."""
+
+    ementa: str = Field(min_length=10, description="Texto da ementa judicial a resumir")
+    max_tokens: int = Field(
+        default=300,
+        ge=50,
+        le=1000,
+        description="Limite de tokens para o resumo gerado",
+    )
+
+
+class ExtractThesesToolInput(ResponseFormatMixin, AIContextMixin):
+    """Entrada para a tool de extração de teses."""
+
+    ementa: str = Field(min_length=10, description="Texto da ementa judicial")
+    inteiro_teor: str | None = Field(
+        default=None,
+        description="Texto completo do inteiro teor para análise profunda",
+    )
+
+
+class CompareDecisionsToolInput(ResponseFormatMixin, AIContextMixin):
+    """Entrada para a tool de comparação de decisões."""
+
+    ementas: list[Annotated[str, Field(min_length=10)]] = Field(
+        min_length=2,
+        max_length=5,
+        description="Lista de ementas para comparar (mínimo 2, máximo 5)",
     )
