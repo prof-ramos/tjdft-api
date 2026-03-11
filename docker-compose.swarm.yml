@@ -1,0 +1,103 @@
+# Docker Swarm Stack for TJDFT API
+# Deploy with: docker stack deploy -c docker-compose.swarm.yml tjdft
+# Requires Traefik v2+ running in the swarm
+
+services:
+  api:
+    image: prof-ramos/tjdft-api:latest
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/tjdft.db
+      - REDIS_URL=redis://redis:6379
+      - CACHE_TTL=3600
+      - DEBUG=false
+    networks:
+      - tjdft-network
+      - traefik-public
+    deploy:
+      mode: replicated
+      replicas: 1  # SQLite não suporta múltiplas réplicas
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+      labels:
+        # Traefik v2 labels for automatic routing
+        # IMPORTANTE: Substituir api.seu-dominio.com.br pelo seu domínio real
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik-public"
+        - "traefik.constraint-label=traefik-public"
+
+        # HTTP Router (redirect to HTTPS)
+        - "traefik.http.routers.tjdft-api.rule=Host(`api.seu-dominio.com.br`)"  # ALTERAR ESTE DOMÍNIO
+        - "traefik.http.routers.tjdft-api.entrypoints=web"
+        - "traefik.http.routers.tjdft-api.middlewares=redirect-to-https"
+
+        # HTTPS Router
+        - "traefik.http.routers.tjdft-api-secure.rule=Host(`api.seu-dominio.com.br`)"  # ALTERAR ESTE DOMÍNIO
+        - "traefik.http.routers.tjdft-api-secure.entrypoints=websecure"
+        - "traefik.http.routers.tjdft-api-secure.tls=true"
+        - "traefik.http.routers.tjdft-api-secure.tls.certresolver=letsencrypt"
+
+        # Service configuration
+        - "traefik.http.services.tjdft-api.loadbalancer.server.port=8000"
+        - "traefik.http.services.tjdft-api.loadbalancer.healthcheck.path=/health"
+        - "traefik.http.services.tjdft-api.loadbalancer.healthcheck.interval=30s"
+
+        # Middleware for rate limiting and security headers
+        - "traefik.http.middlewares.tjdft-api-ratelimit.ratelimit.average=100"
+        - "traefik.http.middlewares.tjdft-api-ratelimit.ratelimit.period=1m"
+        - "traefik.http.routers.tjdft-api-secure.middlewares=tjdft-api-headers,tjdft-api-ratelimit"
+        - "traefik.http.middlewares.tjdft-api-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+        - "traefik.http.middlewares.tjdft-api-headers.headers.frameoptions=SAMEORIGIN"
+        - "traefik.http.middlewares.tjdft-api-headers.headers.contentsecuritypolicy=default-src 'self'"
+        - "traefik.http.middlewares.tjdft-api-headers.headers.browserxssfilter=true"
+        - "traefik.http.middlewares.tjdft-api-headers.headers.referrerpolicy=no-referrer"
+
+        # Portainer labels
+        - "com.docker.compose.image=prof-ramos/tjdft-api"
+    volumes:
+      - tjdft-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - tjdft-network
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "com.docker.compose.image=redis:7-alpine"
+    volumes:
+      - redis-data:/data
+
+networks:
+  tjdft-network:
+    driver: overlay
+    attachable: true
+  traefik-public:
+    external: true
+
+volumes:
+  tjdft-data:
+    driver: local
+  redis-data:
+    driver: local
