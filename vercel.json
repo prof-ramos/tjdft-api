@@ -2,16 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pip install -r requirements.txt",
   "framework": null,
-  "pythonVersion": "3.11",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index.py"
-    }
-  ],
-  "functions": {
-    "api/index.py": {
-      "runtime": "python3.11"
-    }
-  }
+  "pythonVersion": "3.11"
 }
