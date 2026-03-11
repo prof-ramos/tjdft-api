@@ -1,6 +1,7 @@
 # Plan: Reestruturar a Pirâmide de Testes
 
 **Generated**: 2026-03-10
+**Status**: T0-T5 complete, T6-T11 deferred
 
 ## Overview
 Objetivo: reorganizar a suíte em três níveis claros para este repositório FastAPI/SQLAlchemy:

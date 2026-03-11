@@ -1,0 +1,33 @@
+name: Documentation Consistency Check
+
+on:
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+      - 'app/config.py'
+      - '**.md'
+  push:
+    paths:
+      - 'pyproject.toml'
+      - 'app/config.py'
+
+jobs:
+  version-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version from pyproject.toml
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "PYPROJECT_VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Extract version from app/config.py
+        run: |
+          VERSION=$(grep -A2 'app_version:' app/config.py | grep 'default=' | sed 's/.*default="\([^"]*\)".*/\1/')
+          echo "CONFIG_VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Compare versions
+        run: |
+          if [ "$PYPROJECT_VERSION" != "$CONFIG_VERSION" ]; then
+            echo "Version mismatch: pyproject.toml=$PYPROJECT_VERSION, config.py=$CONFIG_VERSION"
+            exit 1
+          fi
+          echo "Versions match: $PYPROJECT_VERSION"

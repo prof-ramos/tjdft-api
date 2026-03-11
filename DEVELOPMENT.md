@@ -6,7 +6,8 @@ Guia completo para desenvolvimento da TJDFT API.
 
 ### Pré-requisitos
 
-- Python 3.11+
+- **Python**: 3.11+ (obrigatório)
+- **uv**: Opcional, para gerenciamento mais rápido de pacotes (alternativa ao pip)
 - Git
 - Docker (opcional, para containerização)
 - Redis (opcional, para cache)
@@ -18,14 +19,13 @@ Guia completo para desenvolvimento da TJDFT API.
 git clone https://github.com/prof-ramos/tjdft-api.git
 cd tjdft-api
 
-# 2. Crie o ambiente virtual
-python -m venv .venv
+# 2. Crie e ative o ambiente virtual
+uv venv .venv
 source .venv/bin/activate  # Linux/Mac
 # .venv\Scripts\activate   # Windows
 
 # 3. Instale as dependências
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+uv pip install -e ".[dev]"
 
 # 4. Configure as variáveis de ambiente
 cp .env.example .env
@@ -35,7 +35,7 @@ cp .env.example .env
 alembic upgrade head
 
 # 6. Inicie o servidor
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 ### Verificação
@@ -112,12 +112,12 @@ git checkout -b feature/nova-feature
 # ... edite os arquivos ...
 
 # 3. Formate e verifique o código
-black . && isort .
-flake8 app/ tests/
-mypy app/
+uv run black . && uv run isort .
+uv run flake8 app/ tests/
+uv run mypy app/
 
 # 4. Execute os testes
-pytest
+uv run pytest
 
 # 5. Commit
 git add .
@@ -213,22 +213,22 @@ git push origin feature/nova-feature
 
 ```bash
 # Todos os testes
-pytest
+uv run pytest
 
 # Com cobertura
-pytest --cov=app --cov-report=html
+uv run pytest --cov=app --cov-report=html
 open htmlcov/index.html
 
 # Teste específico
-pytest tests/test_services/test_tjdft_client.py -v
+uv run pytest tests/test_services/test_tjdft_client.py -v
 
 # Teste por marcador
-pytest -m unit        # apenas unitários
-pytest -m integration # apenas integração
-pytest -m e2e         # apenas e2e
+uv run pytest -m unit        # apenas unitários
+uv run pytest -m integration # apenas integração
+uv run pytest -m e2e         # apenas e2e
 
 # Paralelo (mais rápido)
-pytest -n auto
+uv run pytest -n auto
 ```
 
 ### Estrutura de Teste
@@ -308,7 +308,7 @@ docker compose up -d redis
 
 ```bash
 # Instalar em modo editable
-pip install -e .
+uv pip install -e .
 
 # Ou definir PYTHONPATH
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
@@ -391,11 +391,11 @@ curl http://localhost:8000/health
 
 | Comando | Propósito |
 |---------|-----------|
-| `uvicorn app.main:app --reload` | Servidor dev |
-| `pytest --cov=app` | Testes + cobertura |
-| `black . && isort .` | Format código |
-| `flake8 app/ tests/` | Lint |
-| `mypy app/` | Type check |
+| `uv run uvicorn app.main:app --reload` | Servidor dev |
+| `uv run pytest --cov=app` | Testes + cobertura |
+| `uv run black . && uv run isort .` | Format código |
+| `uv run flake8 app/ tests/` | Lint |
+| `uv run mypy app/` | Type check |
 | `alembic revision --autogenerate` | Nova migration |
 | `make dev` | Docker dev |
 | `make buildx` | Docker multi-arch |

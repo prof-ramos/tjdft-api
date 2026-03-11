@@ -1,6 +1,6 @@
 [project]
 name = "tjdft-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "API do Tribunal de Justiça do Distrito Federal e Territórios"
 readme = "README.md"
 requires-python = ">=3.11"

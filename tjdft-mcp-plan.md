@@ -1,6 +1,7 @@
 # Plan: TJDFT MCP (camada do projeto) com implementação e testes
 
 **Generated**: 2026-03-11
+**Status**: IMPLEMENTED (see app/mcp/)
 
 ## Overview
 Implementar um servidor MCP em Python/FastMCP que expõe ferramentas orientadas a workflow usando a camada de código do projeto (serviços/adapters), não a API bruta do TJDFT. O plano corrige os riscos de concorrência de edição, define semântica de paginação/filtros e separa trilha core da trilha opcional de IA.

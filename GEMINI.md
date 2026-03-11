@@ -165,7 +165,7 @@ logger.error("falha_busca", erro=str(exc), termo=termo)
 
 - Use `pytest` com `pytest-asyncio` para testes assíncronos.
 - Fixtures em `tests/fixtures/` ou no mesmo arquivo `conftest.py`.
--命名ação: `test_*.py`, classes `Test*`, funções `test_*`.
+- Nomenclatura: `test_*.py`, classes `Test*`, funções `test_*`.
 - Use mocks/factories para repositories (`app.repositories`).
 - Testes de integração em `tests/test_api/` para testar endpoints completos.
 - Exemplo de fixture:

@@ -1,5 +1,11 @@
 # Open Questions
 
+## Update All Documentation - 2026-03-11 (Hybrid Approach)
+
+- [ ] What version should we use for the consistency update? — **Plan recommends:** 0.2.0 since MCP was added as a significant feature. Options: 0.2.0, 1.0.0 (milestone), or keep 0.1.0
+- [ ] Should MCP implementation docs be in Portuguese or English? — **Plan recommends:** Portuguese to match existing contract.md and quickstart.md
+- [ ] Deferred: Tool catalog expansion — Plan defers full tool catalog; `contract.md` already provides tool specifications
+
 ## TJDFT Quick Wins Revised - 2026-03-10
 
 - [x] Should `resumo_relevancia` include full ementa or just snippets? — **Decision:** Just snippets from `marcadores`, full ementa only on detail endpoint

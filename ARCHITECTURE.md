@@ -38,6 +38,18 @@ tjdft-api/
 │       ├── cache.py             # Unified cache manager (Redis + in-memory)
 │       ├── filtros.py           # Search filter utilities
 │       └── enrichment.py        # Data enrichment utilities
+│   └── mcp/                     # MCP (Model Context Protocol) server
+│       ├── __main__.py          # Entry point (python -m app.mcp)
+│       ├── server.py            # FastMCP server + lifespan
+│       ├── runtime.py           # MCPRuntime (cache, DB sessions, TJDFT client, AI)
+│       ├── constants.py         # Enums (ResponseFormat, etc.)
+│       ├── errors.py            # Error mapping to MCP error types
+│       ├── formatters.py        # Response formatting (markdown/JSON)
+│       ├── schemas.py           # Pydantic input schemas for tools
+│       └── tools/               # MCP tools implementation
+│           ├── search_tools.py  # tjdft_search_decisions, tjdft_get_metadata
+│           ├── history_tools.py # tjdft_get_consulta, tjdft_list_history
+│           └── ai_tools.py      # tjdft_ai_summarize, tjdft_ai_extract_theses
 ├── tests/                       # Test suite
 │   ├── test_api/                # API endpoint tests
 │   ├── test_services/           # Service layer tests
@@ -57,14 +69,18 @@ tjdft-api/
 ## 2. High-Level System Diagram
 
 ```
-[Client/User]
+[Client/User]        [AI Agent (MCP Client)]
+        |                       |
+        v                       v
+[FastAPI Application]    [MCP Server (stdio)]
+        |                       |
+        +--[Cache Manager]<-----+
+               |
+               v
+        [Redis / In-Memory]
+        ^
         |
-        v
-[FastAPI Application] <--> [Cache Manager] <--> [Redis / In-Memory]
-        |                                ^
-        |                                |
-        v                                |
-[TJDFTClient] --------------------- (cache lookup)
+[TJDFTClient] -- (cache lookup)
         |
         v
 [External API: TJDFT Jurisprudence]
@@ -77,10 +93,10 @@ tjdft-api/
 ```
 
 **Data Flow:**
-1. Client sends search request to FastAPI endpoint
-2. `BuscaService` checks cache for existing results
+1. Client sends search request to FastAPI endpoint (or AI agent via MCP)
+2. `BuscaService` (or MCP tool) checks cache for existing results
 3. On cache miss, `TJDFTClient` makes HTTP request to TJDFT API
-4. Response is cached and returned to client
+4. Response is cached and returned to client/agent
 5. Search history is logged to database via repository layer
 
 ## 3. Core Components
@@ -200,6 +216,25 @@ tjdft-api/
 **Location:** `app/utils/cache.py`
 
 **Cache Key Pattern:** `{prefix}:{type}:{hash}`
+
+### 3.5. MCP Server
+
+**Name:** TJDFT MCP Server
+
+**Description:** Model Context Protocol (MCP) server exposing TJDFT jurisprudence search as tools for AI agents. Implements FastMCP with stdio transport.
+
+**Technologies:** FastMCP, Pydantic v2
+
+**Key Features:**
+- Search tools: `tjdft_search_decisions`, `tjdft_get_metadata`, `tjdft_search_all_pages`
+- History tools: `tjdft_get_consulta`, `tjdft_list_history`, `tjdft_find_similar_decisions`
+- AI tools (optional): `tjdft_ai_summarize`, `tjdft_ai_extract_theses`, `tjdft_ai_compare_decisions`
+- Unified runtime with cache, DB sessions, TJDFT client, and AI service
+- Response formatting: markdown (default) or JSON
+
+**Entry Point:** `app/mcp/__main__.py` (execute via `python -m app.mcp`)
+
+**Documentation:** See [MCP Implementation Guide](docs/mcp/implementation.md) for complete details.
 
 ## 4. Data Stores
 
