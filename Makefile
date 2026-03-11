@@ -5,7 +5,7 @@
 
 # Variables
 IMAGE_NAME = tjdft-api
-REGISTRY = prof-ramos
+REGISTRY = gabrielramosprof
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 PLATFORMS = linux/amd64,linux/arm64
 

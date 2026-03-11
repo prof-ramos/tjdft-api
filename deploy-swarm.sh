@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 IMAGE_NAME="tjdft-api"
-REGISTRY="prof-ramos"
+REGISTRY="gabrielramosprof"
 VERSION=${1:-latest}
 FULL_IMAGE="$REGISTRY/$IMAGE_NAME:$VERSION"
 STACK_NAME="tjdft"
