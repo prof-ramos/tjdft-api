@@ -1,18 +1,71 @@
-.git
-.gitignore
-.venv
-venv
-__pycache__
-*.pyc
-.pytest_cache
-.mypy_cache
-.ruff_cache
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Testing
+.pytest_cache/
 .coverage
-htmlcov
-*.egg-info
+htmlcov/
+*.cover
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# Documentation
+*.md
+docs/
+
+# Environment
 .env
 .env.*
 !.env.example
-data/cache
-logs
+
+# Data
+data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Logs
 *.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude / OMC
+.claude/
+.omc/
+.omx/
+.claude.backup-*/
+
+# Testing/CI
+.github/
+tests/
+
+# Alembic (alembic.ini is included)
+alembic/versions/*.pyc

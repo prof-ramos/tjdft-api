@@ -1,9 +1,10 @@
 """Main FastAPI application entry point"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import get_settings
 from app.api.v1 import router as api_v1_router
+from app.config import get_settings
 
 settings = get_settings()
 
@@ -32,10 +33,11 @@ async def root():
     """API root endpoint"""
     return {
         "message": "TJDFT API",
-        "version": "0.1.0",
+        "version": settings.app_version,
         "docs": "/docs",
         "redoc": "/redoc",
     }
+
 
 @app.get("/health", tags=["Health"])
 async def health_check():

@@ -5,6 +5,12 @@ This module provides a complete async client for interacting with the TJDFT
 (Tribunal de Justiça do Distrito Federal e Territórios) jurisprudence API.
 Features: configurable timeouts, retry with exponential backoff, rate limiting,
 structured logging, graceful fallbacks, and response validation.
+
+API Details:
+    - Busca:     POST https://jurisdf.tjdft.jus.br/api/v1/pesquisa
+    - Metadados: GET  https://jurisdf.tjdft.jus.br/api/v1/pesquisa
+    - Cobre apenas acórdãos (2ª instância)
+    - Paginação 0-indexed, máx 40 resultados por página
 """
 
 import asyncio
@@ -14,7 +20,7 @@ import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional, cast, Union
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -65,7 +71,7 @@ class TJDFTSearchResult(BaseModel):
     """Schema de resposta de busca."""
     total: int = 0
     itens: List[TJDFTItem] = []
-    pagina: int = 1
+    pagina: int = 0
     tamanho_pagina: int = 20
 
 
@@ -158,6 +164,10 @@ class TJDFTClient:
     """
     Cliente assíncrono para API de pesquisa do TJDFT.
 
+    Realiza buscas de acórdãos via POST com suporte a filtros por relator,
+    classe processual e órgão julgador. Inclui cache, retry com backoff
+    exponencial, rate limiting e tratamento de erros.
+
     Features:
         - Configurable timeouts and retries
         - Exponential backoff retry logic
@@ -165,16 +175,13 @@ class TJDFTClient:
         - Graceful fallback responses
         - Structured logging
         - Pydantic response validation
-
-    Example:
-        >>> cache = CacheManager()
-        >>> async with TJDFTClient(cache) as client:
-        ...     response = await client.buscar_simples("tributário")
-        ...     if response.success:
-        ...         print(response.data)
     """
 
     BASE_URL = "https://jurisdf.tjdft.jus.br/api/v1/pesquisa"
+    MAX_RETRIES = 3
+    DEFAULT_TIMEOUT = 30.0
+    CONNECT_TIMEOUT = 10.0
+    MAX_TAMANHO = 40
 
     def __init__(
         self,
@@ -198,7 +205,7 @@ class TJDFTClient:
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self._client: Optional[httpx.AsyncClient] = None
+        self.client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = RateLimiter(rate=rate_limit)
 
         logger.info(
@@ -212,14 +219,8 @@ class TJDFTClient:
         )
 
     async def __aenter__(self):
-        """
-        Async context manager entry.
-
-        Returns:
-            Self for use in async with statements
-        """
-        self._client = httpx.AsyncClient(
-            timeout=httpx.Timeout(self.timeout),
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(self.timeout, connect=self.CONNECT_TIMEOUT),
             limits=httpx.Limits(
                 max_keepalive_connections=5,
                 max_connections=10
@@ -228,586 +229,230 @@ class TJDFTClient:
             headers={
                 "User-Agent": "TJDFT-API/1.0",
                 "Accept": "application/json",
-            }
+                "Content-Type": "application/json",
+            },
         )
-        logger.debug("AsyncClient created")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """
-        Async context manager exit.
-
-        Ensures the HTTP client is properly closed.
-        """
-        if self._client:
-            await self._client.aclose()
+        if self.client:
+            await self.client.aclose()
             logger.debug("AsyncClient closed")
+            self.client = None
 
     async def buscar_simples(
         self,
-        texto: str,
-        pagina: int = 1,
-        tamanho_pagina: int = 20,
-    ) -> TJDFTResponse:
+        query: str,
+        pagina: int = 0,
+        tamanho: int = 20,
+    ) -> Union[Dict[str, Any], TJDFTResponse]:
         """
-        Busca simples por texto com fallback graceful.
+        Busca acórdãos por texto livre com suporte a fallback.
 
         Args:
-            texto: Termo de busca
-            pagina: Número da página (default: 1)
-            tamanho_pagina: Tamanho da página (default: 20)
+            query: Termo de busca (pode ser vazio).
+            pagina: Página (0-indexed).
+            tamanho: Resultados por página (máx 40).
 
         Returns:
-            TJDFTResponse com resultado ou erro
+            Dict ou TJDFTResponse com resultados.
         """
-        if not texto or not texto.strip():
-            return TJDFTResponse(
-                success=False,
-                error="Query parameter cannot be empty",
-                fallback=True
-            )
+        if not isinstance(query, str):
+            return TJDFTResponse(success=False, error="Query must be a string", fallback=True)
+
+        tamanho = min(tamanho, self.MAX_TAMANHO)
+        payload = {"query": query, "pagina": pagina, "tamanho": tamanho}
+        cache_key = self._build_cache_key("simples", payload)
 
         try:
-            # Tenta cache primeiro
-            cache_key = f"busca:{texto}:{pagina}:{tamanho_pagina}"
-            cached = await self._cache.get(cache_key)
-
+            cached = self.cache.get(cache_key)
             if cached:
-                logger.info(
-                    "Cache hit",
-                    extra={"extra_data": {
-                        "query": texto,
-                        "pagina": pagina,
-                        "cache_hit": True,
-                    }}
-                )
-                # Handle both dict and JSON string from cache
-                if isinstance(cached, str):
-                    cached = json.loads(cached)
-                return TJDFTResponse(success=True, data=cached, cached=True)
+                logger.debug(f"Cache hit: {cache_key}")
+                data = json.loads(cached) if isinstance(cached, str) else cached
+                return TJDFTResponse(success=True, data=data, cached=True)
 
-            # Rate limiting
             async with self._rate_limiter:
-                params = {
-                    "q": texto.strip(),
-                    "pagina": pagina,
-                    "tamanho": tamanho_pagina,
-                }
+                data = await self._post(payload)
+                result = self._normalize_response(data, pagina, tamanho)
 
-                dados = await self._request_with_retry("GET", "", params=params)
+                # Validate response
+                if not self._validate_response(result):
+                    return TJDFTResponse(success=False, error="Invalid API response format", fallback=True)
 
-                # Valida resposta
-                if not self._validate_response(dados):
-                    logger.warning(
-                        "Resposta inválida do TJDFT",
-                        extra={"extra_data": {"query": texto}}
-                    )
-                    return TJDFTResponse(
-                        success=False,
-                        error="Resposta do TJDFT em formato inesperado",
-                        fallback=True
-                    )
+                self.cache.set(cache_key, result, ttl=3600)
+                return TJDFTResponse(success=True, data=result)
 
-                # Atualiza cache
-                await self._cache.set(cache_key, dados, ttl=3600)
-
-                logger.info(
-                    "Busca concluída com sucesso",
-                    extra={"extra_data": {
-                        "query": texto,
-                        "pagina": pagina,
-                        "results": len(dados.get("dados", [])),
-                        "cache_hit": False,
-                    }}
-                )
-
-                return TJDFTResponse(success=True, data=dados)
-
-        except TJDFTConnectionError as e:
-            logger.error(
-                f"Erro de conexão: {e}",
-                extra={"extra_data": {"query": texto}}
-            )
-            return TJDFTResponse(
-                success=False,
-                error="API do TJDFT indisponível. Tente novamente mais tarde.",
-                fallback=True
-            )
+        except (TJDFTConnectionError, TJDFTTimeoutError) as e:
+            logger.error(f"Network error in buscar_simples: {e}")
+            return TJDFTResponse(success=False, error=str(e), fallback=True)
         except Exception as e:
-            logger.exception(
-                f"Erro inesperado: {e}",
-                extra={"extra_data": {"query": texto}}
-            )
-            return TJDFTResponse(
-                success=False,
-                error=f"Erro interno: {str(e)}",
-                fallback=True
-            )
+            logger.exception(f"Unexpected error in buscar_simples: {e}")
+            return TJDFTResponse(success=False, error=f"Internal error: {str(e)}", fallback=True)
 
     async def buscar_com_filtros(
         self,
-        query: str,
+        query: str = "",
         relator: Optional[str] = None,
         classe: Optional[str] = None,
         orgao_julgador: Optional[str] = None,
-        data_inicio: Optional[str] = None,
-        data_fim: Optional[str] = None,
-        pagina: int = 1,
-        tamanho_pagina: int = 20,
+        base: Optional[str] = None,
+        subbase: Optional[str] = None,
+        revisor: Optional[str] = None,
+        relator_designado: Optional[str] = None,
+        processo: Optional[str] = None,
+        pagina: int = 0,
+        tamanho: int = 20,
     ) -> TJDFTResponse:
-        """
-        Busca com filtros avançados e fallback graceful.
+        """Busca com filtros avançados e fallback graceful."""
+        tamanho = min(tamanho, self.MAX_TAMANHO)
 
-        Args:
-            query: Termo de busca
-            relator: Nome do relator (filtro opcional)
-            classe: Classe processual (filtro opcional)
-            orgao_julgador: Órgão julgador (filtro opcional)
-            data_inicio: Data início (formato ISO, filtro opcional)
-            data_fim: Data fim (formato ISO, filtro opcional)
-            pagina: Número da página (default: 1)
-            tamanho_pagina: Tamanho da página (default: 20)
+        termos = []
+        if relator: termos.append({"campo": "nomeRelator", "valor": relator})
+        if classe: termos.append({"campo": "descricaoClasseCnj", "valor": classe})
+        if orgao_julgador: termos.append({"campo": "descricaoOrgaoJulgador", "valor": orgao_julgador})
+        if base: termos.append({"campo": "base", "valor": base})
+        if subbase: termos.append({"campo": "subbase", "valor": subbase})
+        if revisor: termos.append({"campo": "nomeRevisor", "valor": revisor})
+        if relator_designado: termos.append({"campo": "nomeRelatorDesignado", "valor": relator_designado})
+        if processo: termos.append({"campo": "processo", "valor": processo})
 
-        Returns:
-            TJDFTResponse com resultado ou erro
-        """
-        if not query or not query.strip():
-            return TJDFTResponse(
-                success=False,
-                error="Query parameter cannot be empty",
-                fallback=True
-            )
+        payload = {"query": query, "pagina": pagina, "tamanho": tamanho}
+        if termos:
+            payload["termosAcessorios"] = termos
+
+        cache_key = self._build_cache_key("filtrada", payload)
 
         try:
-            # Tenta cache primeiro
-            params_hash = hashlib.md5(
-                json.dumps({
-                    "q": query.strip(),
-                    "relator": relator,
-                    "classe": classe,
-                    "orgao_julgador": orgao_julgador,
-                    "data_inicio": data_inicio,
-                    "data_fim": data_fim,
-                    "pagina": pagina,
-                    "tamanho": tamanho_pagina,
-                }, sort_keys=True).encode()
-            ).hexdigest()[:8]
-
-            cache_key = f"busca:filtros:{params_hash}"
-            cached = await self._cache.get(cache_key)
-
+            cached = self.cache.get(cache_key)
             if cached:
-                logger.info(
-                    "Cache hit (filtros)",
-                    extra={"extra_data": {
-                        "query": query,
-                        "pagina": pagina,
-                        "cache_hit": True,
-                    }}
-                )
-                if isinstance(cached, str):
-                    cached = json.loads(cached)
-                return TJDFTResponse(success=True, data=cached, cached=True)
+                data = json.loads(cached) if isinstance(cached, str) else cached
+                return TJDFTResponse(success=True, data=data, cached=True)
 
-            # Rate limiting
             async with self._rate_limiter:
-                params = {
-                    "q": query.strip(),
-                    "pagina": pagina,
-                    "tamanho": tamanho_pagina,
-                }
+                data = await self._post(payload)
+                result = self._normalize_response(data, pagina, tamanho)
 
-                # Add optional filters
-                if relator:
-                    params["relator"] = relator
-                if classe:
-                    params["classe"] = classe
-                if orgao_julgador:
-                    params["orgao_julgador"] = orgao_julgador
-                if data_inicio:
-                    params["data_inicio"] = data_inicio
-                if data_fim:
-                    params["data_fim"] = data_fim
+                if not self._validate_response(result):
+                    return TJDFTResponse(success=False, error="Invalid response format", fallback=True)
 
-                dados = await self._request_with_retry("GET", "", params=params)
+                self.cache.set(cache_key, result, ttl=3600)
+                return TJDFTResponse(success=True, data=result)
 
-                # Valida resposta
-                if not self._validate_response(dados):
-                    logger.warning(
-                        "Resposta inválida do TJDFT (filtros)",
-                        extra={"extra_data": {"query": query}}
-                    )
-                    return TJDFTResponse(
-                        success=False,
-                        error="Resposta do TJDFT em formato inesperado",
-                        fallback=True
-                    )
-
-                # Atualiza cache
-                await self._cache.set(cache_key, dados, ttl=3600)
-
-                logger.info(
-                    "Busca com filtros concluída",
-                    extra={"extra_data": {
-                        "query": query,
-                        "pagina": pagina,
-                        "results": len(dados.get("dados", [])),
-                    }}
-                )
-
-                return TJDFTResponse(success=True, data=dados)
-
-        except TJDFTConnectionError as e:
-            logger.error(
-                f"Erro de conexão (filtros): {e}",
-                extra={"extra_data": {"query": query}}
-            )
-            return TJDFTResponse(
-                success=False,
-                error="API do TJDFT indisponível. Tente novamente mais tarde.",
-                fallback=True
-            )
         except Exception as e:
-            logger.exception(
-                f"Erro inesperado (filtros): {e}",
-                extra={"extra_data": {"query": query}}
-            )
-            return TJDFTResponse(
-                success=False,
-                error=f"Erro interno: {str(e)}",
-                fallback=True
-            )
+            logger.error(f"Error in buscar_com_filtros: {e}")
+            return TJDFTResponse(success=False, error=str(e), fallback=True)
 
     async def buscar_todas_paginas(
         self,
-        query: str,
+        query: str = "",
         max_paginas: int = 10,
-        tamanho_pagina: int = 20,
-        **filtros
-    ) -> TJDFTResponse:
-        """
-        Busca todas as páginas automaticamente.
+        tamanho: int = 40,
+        **filtros,
+    ) -> Union[List[Dict[str, Any]], TJDFTResponse]:
+        """Coleta acórdãos de múltiplas páginas automaticamente."""
+        all_registros = []
+        tamanho = min(tamanho, self.MAX_TAMANHO)
 
-        Args:
-            query: Termo de busca
-            max_paginas: Número máximo de páginas a buscar (default: 10)
-            tamanho_pagina: Tamanho da página (default: 20)
-            **filtros: Filtros adicionais (relator, classe, etc.)
+        logger.info(f"Multi-page search: query='{query}', max={max_paginas}")
 
-        Returns:
-            TJDFTResponse com todos os resultados ou erro
-        """
-        try:
-            all_results = []
-            pagina = 1
-
-            logger.info(
-                "Multi-page search iniciada",
-                extra={"extra_data": {
-                    "query": query,
-                    "max_pages": max_paginas,
-                }}
+        for pagina in range(max_paginas):
+            response = await self.buscar_com_filtros(
+                query=query, pagina=pagina, tamanho=tamanho, **filtros
             )
 
-            while pagina <= max_paginas:
-                # Check if we have filters
-                if filtros:
-                    response = await self.buscar_com_filtros(
-                        query=query,
-                        pagina=pagina,
-                        tamanho_pagina=tamanho_pagina,
-                        **filtros
-                    )
-                else:
-                    response = await self.buscar_simples(
-                        texto=query,
-                        pagina=pagina,
-                        tamanho_pagina=tamanho_pagina
-                    )
+            if not response.success:
+                if all_registros: # Return partial if we have something
+                    return all_registros
+                return response
 
-                if not response.success:
-                    return response
+            registros = response.data.get("registros", [])
+            if not registros:
+                break
 
-                # Extract data
-                dados = response.data.get("dados", [])
+            all_registros.extend(registros)
+            total = response.data.get("total", 0)
+            if len(all_registros) >= total:
+                break
 
-                if not dados:
-                    logger.info(
-                        f"No more results at page {pagina}",
-                        extra={"extra_data": {"pagina": pagina}}
-                    )
-                    break
+            await asyncio.sleep(0.1)
 
-                all_results.extend(dados)
-                logger.info(
-                    f"Retrieved {len(dados)} results from page {pagina}",
-                    extra={"extra_data": {"pagina": pagina}}
-                )
+        return all_registros
 
-                # Check if there are more pages
-                paginacao = response.data.get("paginacao", {})
-                total = paginacao.get("total", 0)
-                pagina_size = paginacao.get("tamanho", tamanho_pagina)
-
-                if len(all_results) >= total:
-                    logger.info(
-                        f"Retrieved all {len(all_results)} results",
-                        extra={"extra_data": {"total_results": len(all_results)}}
-                    )
-                    break
-
-                pagina += 1
-
-                # Small delay between pages
-                await asyncio.sleep(0.1)
-
-            logger.info(
-                "Multi-page search concluída",
-                extra={"extra_data": {"total_results": len(all_results)}}
-            )
-
-            return TJDFTResponse(
-                success=True,
-                data={"dados": all_results, "total": len(all_results)}
-            )
-
-        except Exception as e:
-            logger.exception(
-                f"Erro inesperado (multi-page): {e}",
-                extra={"extra_data": {"query": query}}
-            )
-            return TJDFTResponse(
-                success=False,
-                error=f"Erro interno: {str(e)}",
-                fallback=True
-            )
-
-    async def get_metadata(self) -> TJDFTResponse:
-        """
-        Obtém metadados da API (filtros disponíveis).
-
-        Returns:
-            TJDFTResponse com metadados ou erro
-        """
+    async def get_metadata(self) -> Union[Dict[str, Any], TJDFTResponse]:
+        """Obtém listas de valores válidos para filtros."""
         cache_key = "tjdft:metadata"
 
         try:
-            # Tenta cache primeiro
-            cached = await self._cache.get(cache_key)
-
+            cached = self.cache.get(cache_key)
             if cached:
-                logger.info("Metadata cache hit")
-                if isinstance(cached, str):
-                    cached = json.loads(cached)
-                return TJDFTResponse(success=True, data=cached, cached=True)
+                return TJDFTResponse(success=True, data=json.loads(cached) if isinstance(cached, str) else cached, cached=True)
 
-            # Rate limiting
-            async with self._rate_limiter:
-                metadata = await self._request_with_retry("GET", self.BASE_URL)
+            if not self.client:
+                raise RuntimeError("Client not initialized")
 
-                # Cache metadata for longer (24 hours)
-                await self._cache.set(cache_key, metadata, ttl=86400)
+            metadata = await self._request_with_retry("GET", self.BASE_URL)
+            self.cache.set(cache_key, metadata, ttl=86400)
+            return TJDFTResponse(success=True, data=metadata)
 
-                logger.info("Metadata retrieved successfully")
-                return TJDFTResponse(success=True, data=metadata)
-
-        except TJDFTConnectionError as e:
-            logger.error(f"Erro de conexão (metadata): {e}")
-            return TJDFTResponse(
-                success=False,
-                error="API do TJDFT indisponível. Tente novamente mais tarde.",
-                fallback=True
-            )
         except Exception as e:
-            logger.exception(f"Erro inesperado (metadata): {e}")
-            return TJDFTResponse(
-                success=False,
-                error=f"Erro interno: {str(e)}",
-                fallback=True
-            )
+            return TJDFTResponse(success=False, error=str(e), fallback=True)
 
-    # ==========================================
-    # Private Methods
-    # ==========================================
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
 
-    async def _request_with_retry(
-        self,
-        method: str,
-        url: str,
-        **kwargs
-    ) -> dict:
-        """
-        Request com retry automático e backoff exponencial.
+    def _build_cache_key(self, search_type: str, payload: Dict[str, Any]) -> str:
+        serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        h = hashlib.md5(serialized.encode()).hexdigest()[:8]
+        return f"tjdft:{search_type}:{h}"
 
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            url: URL completa ou endpoint
-            **kwargs: Additional arguments for httpx.request
+    async def _post(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Realiza POST com retry automático."""
+        return await self._request_with_retry("POST", self.BASE_URL, json=payload)
 
-        Returns:
-            Dict com a resposta da API
+    async def _request_with_retry(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
+        """Request com retry e backoff exponencial."""
+        if not self.client:
+            raise RuntimeError("Client not initialized")
 
-        Raises:
-            TJDFTConnectionError: Erro de conexão após retries
-        """
         last_exception = None
-        full_url = url if url.startswith("http") else f"{self.BASE_URL}/{url}".rstrip("/")
-
         for attempt in range(self.max_retries):
             try:
-                if not self._client:
-                    raise RuntimeError("Client not initialized. Use 'async with' statement.")
-
-                logger.debug(
-                    f"Making request (attempt {attempt + 1}/{self.max_retries})",
-                    extra={"extra_data": {
-                        "method": method,
-                        "url": full_url,
-                        "attempt": attempt + 1,
-                    }}
-                )
-
-                response = await self._client.request(method, full_url, **kwargs)
+                response = await self.client.request(method, url, **kwargs)
                 response.raise_for_status()
+                return cast(Dict[str, Any], response.json())
 
-                data = response.json()
-
-                # Normalize response format
-                result = {
-                    "dados": self._extract_results(data),
-                    "paginacao": self._extract_pagination(data, kwargs.get("params", {})),
-                    "sucesso": True,
-                }
-
-                logger.debug(
-                    f"Request successful",
-                    extra={"extra_data": {"results": len(result["dados"])}}
-                )
-
-                return result
-
-            except (httpx.TimeoutException, httpx.NetworkError) as e:
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2 ** attempt)  # Exponential backoff
-                    logger.warning(
-                        f"Retry {attempt + 1}/{self.max_retries} em {delay}s: {e}",
-                        extra={"extra_data": {"delay": delay, "error": str(e)}}
-                    )
+                    delay = self.retry_delay * (2 ** attempt)
                     await asyncio.sleep(delay)
                     continue
-                raise
+                if isinstance(e, httpx.TimeoutException):
+                    raise TJDFTTimeoutError(f"Timeout after {self.max_retries} attempts")
+                raise TJDFTConnectionError(f"Connection failed: {e}")
 
             except httpx.HTTPStatusError as e:
-                if e.response.status_code >= 500:
-                    last_exception = e
-                    if attempt < self.max_retries - 1:
-                        delay = self.retry_delay * (2 ** attempt)
-                        logger.warning(
-                            f"Server error {e.response.status_code}, retry em {delay}s",
-                            extra={"extra_data": {
-                                "status_code": e.response.status_code,
-                                "delay": delay,
-                            }}
-                        )
-                        await asyncio.sleep(delay)
-                        continue
-                    raise
+                if e.response.status_code >= 500 and attempt < self.max_retries - 1:
+                    delay = self.retry_delay * (2 ** attempt)
+                    await asyncio.sleep(delay)
+                    continue
+                raise TJDFTAPIError(f"API Error {e.response.status_code}: {e.response.text}")
 
-                # Client errors - don't retry
-                logger.error(
-                    f"Client error {e.response.status_code}",
-                    extra={"extra_data": {"status_code": e.response.status_code}}
-                )
-                raise TJDFTAPIError(
-                    f"API client error: {e.response.status_code} - {e.response.text}"
-                ) from e
-
-        raise TJDFTConnectionError(
-            f"Failed after {self.max_retries} retries: {last_exception}"
-        )
+        raise TJDFTClientError(f"Failed after {self.max_retries} retries: {last_exception}")
 
     def _validate_response(self, data: dict) -> bool:
-        """
-        Valida se resposta do TJDFT está no formato esperado.
+        """Valida se resposta está no formato esperado (opcional para simplicidade interna)."""
+        return "registros" in data or "itens" in data
 
-        Args:
-            data: Dados da resposta
-
-        Returns:
-            True se válido, False caso contrário
-        """
-        try:
-            TJDFTSearchResult(
-                total=data.get("paginacao", {}).get("total", 0),
-                itens=[TJDFTItem(**item) for item in data.get("dados", [])],
-                pagina=data.get("paginacao", {}).get("pagina", 1),
-                tamanho_pagina=data.get("paginacao", {}).get("tamanho", 20)
-            )
-            return True
-        except ValidationError as e:
-            logger.warning(
-                f"Resposta inválida do TJDFT: {e}",
-                extra={"extra_data": {"validation_error": str(e)}}
-            )
-            return False
-
-    def _extract_results(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Extrai a lista de resultados da resposta da API.
-
-        Args:
-            data: Dados brutos da API
-
-        Returns:
-            Lista de resultados (pode estar vazia)
-        """
-        # Try common result key names
-        if isinstance(data, list):
-            return data
-
-        if isinstance(data, dict):
-            for key in ["dados", "results", "items", "data"]:
-                if key in data and isinstance(data[key], list):
-                    return data[key]
-
-        # If no results found, return empty list
-        logger.warning(
-            f"Could not extract results from API response: {type(data)}"
-        )
-        return []
-
-    def _extract_pagination(
-        self,
-        data: Dict[str, Any],
-        params: Dict[str, Any]
+    def _normalize_response(
+        self, data: Dict[str, Any], pagina: int, tamanho: int
     ) -> Dict[str, Any]:
-        """
-        Extrai informações de paginação da resposta da API.
-
-        Args:
-            data: Dados brutos da API
-            params: Parâmetros da requisição
-
-        Returns:
-            Dict com informações de paginação
-        """
-        paginacao = {
-            "pagina": params.get("pagina", 1),
-            "tamanho": params.get("tamanho", params.get("tamanho_pagina", 20)),
-            "total": 0,
+        """Normaliza a resposta da API para formato consistente."""
+        return {
+            "registros": data.get("registros", []),
+            "total": data.get("hits", {}).get("value", 0),
+            "pagina": pagina,
+            "tamanho": tamanho,
+            "agregacoes": data.get("agregacoes", {}),
         }
-
-        if isinstance(data, dict):
-            # Try to extract pagination info
-            for key in ["paginacao", "pagination", "meta"]:
-                if key in data and isinstance(data[key], dict):
-                    paginacao.update(data[key])
-                    break
-
-            # Try to get total from data length
-            results = self._extract_results(data)
-            if results and "total" not in paginacao:
-                paginacao["total"] = len(results)
-
-        return paginacao
