@@ -131,6 +131,8 @@ curl -s -X POST "http://localhost:8000/api/v1/busca/" \
 - **OpenAPI**: http://localhost:8000/openapi.json
 - **Referência da API do projeto**: [docs/api_reference.md](docs/api_reference.md)
 - **API pública original do TJDFT usada como fonte de dados**: [docs/tjdft_api.md](docs/tjdft_api.md)
+- **MCP (quickstart)**: [docs/mcp/quickstart.md](docs/mcp/quickstart.md)
+- **MCP (configuração de exemplo)**: [docs/mcp/example.mcp.json](docs/mcp/example.mcp.json)
 
 ## 🧪 Testes
 

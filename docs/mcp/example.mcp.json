@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tjdft-api-mcp": {
+      "name": "TJDFT API MCP",
+      "command": "uv",
+      "args": ["run", "python", "-m", "app.mcp"],
+      "env": {}
+    }
+  }
+}
