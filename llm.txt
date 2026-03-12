@@ -54,10 +54,23 @@ tests/
 │   ├── test_busca_e2e.py       # 9 busca endpoint tests
 │   ├── test_cache_e2e.py       # 10 Redis integration tests
 │   └── test_database_e2e.py    # 8 PostgreSQL persistence tests
-├── test_api/                    # API contract tests
+├── test_api/                    # API contract tests (11 tests)
+│   └── test_busca.py           # Busca endpoint HTTP tests
+├── test_schemas/                # Schema validation tests (27 tests)
+│   ├── test_consulta_schema.py # BuscaRequest/Response schemas
+│   ├── test_decisao_schema.py  # DecisaoResponse/Enriquecida schemas
+│   └── test_analise_schema.py  # Analysis schemas
 ├── test_services/               # Service layer tests
 ├── test_repositories/           # Repository tests
-└── test_utils/                  # Utility tests
+│   ├── integration/            # Database integration tests (15 tests)
+│   │   └── test_decisao_integration.py  # CRUD, upsert, filtering
+│   └── unit/                   # Repository unit tests
+├── test_utils/                  # Utility tests
+│   ├── test_cache.py           # CacheManager tests
+│   ├── test_enrichment.py      # Density/instance calculations
+│   └── test_filtros.py         # Filter validation
+└── performance/                # Performance tests (13 tests)
+    └── test_cache_performance.py  # LRU, hit/miss benchmarks
 docs/
 ├── e2e-test-plan.md             # E2E testing documentation
 ├── testing-backend-strategy.md  # SQLite in-memory for tests
@@ -214,7 +227,7 @@ Returns valid filter values: `relatores` (228), `revisores` (63), `classes` (125
 
 ## Testing
 
-**148 tests, 88% coverage**
+**239 tests, 77% coverage**
 
 ```bash
 # Unit/integration tests (no Docker required)
