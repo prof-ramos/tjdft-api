@@ -48,6 +48,7 @@ markers = [
     "api: testes de contrato HTTP e wiring da aplicação FastAPI",
     "e2e: end-to-end tests (requires Docker for PostgreSQL and Redis)",
     "slow: slow-running tests that may require external dependencies",
+    "performance: testes de performance e benchmark",
 ]
 
 [tool.black]

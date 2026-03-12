@@ -70,10 +70,12 @@ venv.bak/
 *.log
 
 # Agent/runtime artifacts
-.omc/sessions/
-.omc/state/
+.omc/
 .omx/
 analisecoderabbit_debug.md
+
+# Keep .omc/docs for reference (but ignore generated artifacts)
+!.omc/docs/
 
 # MyPy
 .mypy_cache/
